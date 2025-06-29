@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import { Sparkles, Bot, Search, Save, Plus, X } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -44,6 +46,8 @@ interface EditingItem {
 }
 
 const Admin: React.FC = () => {
+  const { session } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'tools' | 'categories' | 'agents'>('tools');
   const [items, setItems] = useState<EditingItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<EditingItem[]>([]);
@@ -53,12 +57,23 @@ const Admin: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categories, setCategories] = useState<EditingItem[]>([]);
 
+  // Check authentication
   useEffect(() => {
-    fetchItems();
-    if (activeTab === 'tools') {
-      fetchCategories();
+    if (!session) {
+      toast.error('Please log in to access the admin panel');
+      navigate('/login');
+      return;
     }
-  }, [activeTab]);
+  }, [session, navigate]);
+
+  useEffect(() => {
+    if (session) {
+      fetchItems();
+      if (activeTab === 'tools') {
+        fetchCategories();
+      }
+    }
+  }, [activeTab, session]);
 
   useEffect(() => {
     // Filter items based on search term
@@ -298,6 +313,19 @@ const Admin: React.FC = () => {
     capabilities[index] = value;
     setEditingItem({ ...editingItem, capabilities });
   };
+
+  // Don't render the admin panel if not authenticated
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-royal-dark flex items-center justify-center">
+        <Toaster position="top-right" />
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-white mb-4">Authentication Required</h1>
+          <p className="text-gray-400">Please log in to access the admin panel.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-royal-dark py-12">
