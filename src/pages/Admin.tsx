@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Sparkles, Bot, Search, Save, Plus, X } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 
 interface Feature {
   title: string;
@@ -74,24 +74,47 @@ const Admin: React.FC = () => {
   }, [searchTerm, items]);
 
   const fetchCategories = async () => {
-    const { data } = await supabase
-      .from('categories')
-      .select('*')
-      .order('name');
-    
-    if (data) setCategories(data);
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name');
+      
+      if (error) {
+        console.error('Error fetching categories:', error);
+        toast.error('Failed to fetch categories');
+        return;
+      }
+      
+      if (data) setCategories(data);
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to fetch categories');
+    }
   };
 
   const fetchItems = async () => {
     setLoading(true);
-    let { data: items } = await supabase
-      .from(activeTab)
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    setItems(items || []);
-    setFilteredItems(items || []);
-    setLoading(false);
+    try {
+      const { data: items, error } = await supabase
+        .from(activeTab)
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching items:', error);
+        toast.error(`Failed to fetch ${activeTab}`);
+        return;
+      }
+      
+      setItems(items || []);
+      setFilteredItems(items || []);
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error(`Failed to fetch ${activeTab}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const validateForm = (item: EditingItem): string | null => {
@@ -278,6 +301,7 @@ const Admin: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-royal-dark py-12">
+      <Toaster position="top-right" />
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold gradient-text">Admin Dashboard</h1>
