@@ -55,16 +55,36 @@ const Admin: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categories, setCategories] = useState<EditingItem[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
   // Check admin authentication
   useEffect(() => {
-    const adminLoggedIn = localStorage.getItem('adminLoggedIn');
-    if (adminLoggedIn === 'true') {
-      setIsLoggedIn(true);
-    } else {
-      toast.error('Please log in to access the admin panel');
-      navigate('/login');
-    }
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setIsLoggedIn(true);
+        setUser(session.user);
+      } else {
+        toast.error('Please log in to access the admin panel');
+        navigate('/login');
+      }
+    };
+
+    checkAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        setIsLoggedIn(false);
+        setUser(null);
+        navigate('/login');
+      } else if (session?.user) {
+        setIsLoggedIn(true);
+        setUser(session.user);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [navigate]);
 
   useEffect(() => {
@@ -89,11 +109,15 @@ const Admin: React.FC = () => {
     }
   }, [searchTerm, items]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('adminLoggedIn');
-    localStorage.removeItem('adminUser');
-    toast.success('Logged out successfully');
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast.success('Logged out successfully');
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Error logging out');
+    }
   };
 
   const fetchCategories = async () => {
@@ -370,6 +394,9 @@ const Admin: React.FC = () => {
                 <Bot className="w-5 h-5" />
                 <span>Agents</span>
               </button>
+            </div>
+            <div className="flex items-center space-x-2 text-gray-400">
+              <span className="text-sm">Welcome, {user?.email}</span>
             </div>
             <button
               onClick={handleLogout}
