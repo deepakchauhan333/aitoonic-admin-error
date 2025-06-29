@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Sparkles, Bot, Search, Save, Plus, X, LogOut } from 'lucide-react';
+import { Sparkles, Bot, Search, Save, Plus, X, LogOut, Upload, Check } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 interface Feature {
@@ -31,6 +31,7 @@ interface EditingItem {
   pricing?: PricingPlan[];
   type?: 'tool' | 'category' | 'agent';
   image_url?: string;
+  image_alt?: string;
   url?: string;
   category_id?: string;
   capabilities?: string[];
@@ -41,6 +42,9 @@ interface EditingItem {
   user_count?: number;
   has_fast_response?: boolean;
   is_secure?: boolean;
+  is_featured?: boolean;
+  is_verified?: boolean;
+  agent_features?: string[];
   [key: string]: any;
 }
 
@@ -56,6 +60,7 @@ const Admin: React.FC = () => {
   const [categories, setCategories] = useState<EditingItem[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Check admin authentication
   useEffect(() => {
@@ -176,6 +181,51 @@ const Admin: React.FC = () => {
     return null;
   };
 
+  const handleImageUpload = async (file: File) => {
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `${activeTab}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        toast.error('Failed to upload image');
+        return;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(filePath);
+
+      setEditingItem(prev => prev ? { ...prev, image_url: publicUrl } : null);
+      toast.success('Image uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!editingItem) return;
 
@@ -195,6 +245,7 @@ const Admin: React.FC = () => {
         seo_title: editingItem.seo_title?.trim() || null,
         seo_description: editingItem.seo_description?.trim() || null,
         image_url: editingItem.image_url?.trim() || null,
+        image_alt: editingItem.image_alt?.trim() || null,
       };
 
       // Add specific fields based on type
@@ -210,14 +261,10 @@ const Admin: React.FC = () => {
       } else if (activeTab === 'agents') {
         dataToSave = {
           ...dataToSave,
-          capabilities: editingItem.capabilities?.filter(cap => cap.trim()) || [],
-          api_endpoint: editingItem.api_endpoint?.trim() || null,
-          pricing_type: editingItem.pricing_type || 'free',
-          status: editingItem.status || 'active',
-          is_available_24_7: editingItem.is_available_24_7 || false,
-          user_count: editingItem.user_count || 0,
-          has_fast_response: editingItem.has_fast_response || false,
-          is_secure: editingItem.is_secure || false
+          agent_features: editingItem.agent_features?.filter(feature => feature.trim()) || [],
+          is_featured: editingItem.is_featured || false,
+          is_verified: editingItem.is_verified || false,
+          pricing_type: editingItem.pricing_type || 'free'
         };
       }
 
@@ -323,27 +370,27 @@ const Admin: React.FC = () => {
     setEditingItem({ ...editingItem, pricing });
   };
 
-  const addCapability = () => {
+  const addAgentFeature = () => {
     if (!editingItem) return;
-    const capabilities = editingItem.capabilities || [];
+    const agentFeatures = editingItem.agent_features || [];
     setEditingItem({
       ...editingItem,
-      capabilities: [...capabilities, '']
+      agent_features: [...agentFeatures, '']
     });
   };
 
-  const removeCapability = (index: number) => {
-    if (!editingItem?.capabilities) return;
-    const capabilities = [...editingItem.capabilities];
-    capabilities.splice(index, 1);
-    setEditingItem({ ...editingItem, capabilities });
+  const removeAgentFeature = (index: number) => {
+    if (!editingItem?.agent_features) return;
+    const agentFeatures = [...editingItem.agent_features];
+    agentFeatures.splice(index, 1);
+    setEditingItem({ ...editingItem, agent_features });
   };
 
-  const updateCapability = (index: number, value: string) => {
-    if (!editingItem?.capabilities) return;
-    const capabilities = [...editingItem.capabilities];
-    capabilities[index] = value;
-    setEditingItem({ ...editingItem, capabilities });
+  const updateAgentFeature = (index: number, value: string) => {
+    if (!editingItem?.agent_features) return;
+    const agentFeatures = [...editingItem.agent_features];
+    agentFeatures[index] = value;
+    setEditingItem({ ...editingItem, agent_features });
   };
 
   // Don't render the admin panel if not authenticated
@@ -447,7 +494,12 @@ const Admin: React.FC = () => {
                         : 'bg-royal-dark hover:bg-royal-dark-lighter'
                     }`}
                   >
-                    <h3 className="font-medium text-white">{item.name}</h3>
+                    <div className="flex items-center space-x-2">
+                      <h3 className="font-medium text-white">{item.name}</h3>
+                      {activeTab === 'agents' && item.is_verified && (
+                        <Check className="w-4 h-4 text-blue-500" />
+                      )}
+                    </div>
                     <p className="text-sm text-gray-400 line-clamp-2">{item.description}</p>
                   </button>
                 ))}
@@ -507,17 +559,74 @@ const Admin: React.FC = () => {
                           required
                         />
                       </div>
+
+                      {/* Image Upload Section */}
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Image URL
+                          Image
                         </label>
-                        <input
-                          type="text"
-                          value={editingItem.image_url || ''}
-                          onChange={(e) => setEditingItem({ ...editingItem, image_url: e.target.value })}
-                          className="w-full px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
-                          placeholder="https://example.com/image.jpg"
-                        />
+                        <div className="space-y-4">
+                          {/* Current Image Preview */}
+                          {editingItem.image_url && (
+                            <div className="relative">
+                              <img
+                                src={editingItem.image_url}
+                                alt="Preview"
+                                className="w-32 h-32 object-cover rounded-lg border border-royal-dark-lighter"
+                              />
+                              <button
+                                onClick={() => setEditingItem({ ...editingItem, image_url: '' })}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+                          
+                          {/* Upload Button */}
+                          <div className="flex items-center space-x-4">
+                            <label className="cursor-pointer">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleImageUpload(file);
+                                }}
+                                className="hidden"
+                              />
+                              <div className="flex items-center space-x-2 bg-royal-dark border border-royal-dark-lighter rounded-lg px-4 py-2 hover:border-royal-gold transition-colors">
+                                <Upload className="w-4 h-4" />
+                                <span>{uploadingImage ? 'Uploading...' : 'Upload Image'}</span>
+                              </div>
+                            </label>
+                            
+                            {/* URL Input */}
+                            <div className="flex-1">
+                              <input
+                                type="text"
+                                value={editingItem.image_url || ''}
+                                onChange={(e) => setEditingItem({ ...editingItem, image_url: e.target.value })}
+                                placeholder="Or paste image URL"
+                                className="w-full px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* Image Alt Text */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                              Image Alt Text
+                            </label>
+                            <input
+                              type="text"
+                              value={editingItem.image_alt || ''}
+                              onChange={(e) => setEditingItem({ ...editingItem, image_alt: e.target.value })}
+                              placeholder="Describe the image for accessibility"
+                              className="w-full px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
+                            />
+                          </div>
+                        </div>
                       </div>
 
                       {/* Tool-specific fields */}
@@ -562,18 +671,6 @@ const Admin: React.FC = () => {
                         <>
                           <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">
-                              API Endpoint
-                            </label>
-                            <input
-                              type="text"
-                              value={editingItem.api_endpoint || ''}
-                              onChange={(e) => setEditingItem({ ...editingItem, api_endpoint: e.target.value })}
-                              className="w-full px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
-                              placeholder="https://api.example.com"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
                               Pricing Type
                             </label>
                             <select
@@ -586,57 +683,25 @@ const Admin: React.FC = () => {
                               <option value="paid">Paid</option>
                             </select>
                           </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Status
-                            </label>
-                            <select
-                              value={editingItem.status || 'active'}
-                              onChange={(e) => setEditingItem({ ...editingItem, status: e.target.value })}
-                              className="w-full px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
-                            >
-                              <option value="active">Active</option>
-                              <option value="inactive">Inactive</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              User Count
-                            </label>
-                            <input
-                              type="number"
-                              value={editingItem.user_count || 0}
-                              onChange={(e) => setEditingItem({ ...editingItem, user_count: parseInt(e.target.value) || 0 })}
-                              className="w-full px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
-                            />
-                          </div>
+                          
                           <div className="grid grid-cols-2 gap-4">
                             <label className="flex items-center space-x-2">
                               <input
                                 type="checkbox"
-                                checked={editingItem.is_available_24_7 || false}
-                                onChange={(e) => setEditingItem({ ...editingItem, is_available_24_7: e.target.checked })}
+                                checked={editingItem.is_featured || false}
+                                onChange={(e) => setEditingItem({ ...editingItem, is_featured: e.target.checked })}
                                 className="rounded"
                               />
-                              <span className="text-gray-300">24/7 Available</span>
+                              <span className="text-gray-300">Featured</span>
                             </label>
                             <label className="flex items-center space-x-2">
                               <input
                                 type="checkbox"
-                                checked={editingItem.has_fast_response || false}
-                                onChange={(e) => setEditingItem({ ...editingItem, has_fast_response: e.target.checked })}
+                                checked={editingItem.is_verified || false}
+                                onChange={(e) => setEditingItem({ ...editingItem, is_verified: e.target.checked })}
                                 className="rounded"
                               />
-                              <span className="text-gray-300">Fast Response</span>
-                            </label>
-                            <label className="flex items-center space-x-2">
-                              <input
-                                type="checkbox"
-                                checked={editingItem.is_secure || false}
-                                onChange={(e) => setEditingItem({ ...editingItem, is_secure: e.target.checked })}
-                                className="rounded"
-                              />
-                              <span className="text-gray-300">Secure</span>
+                              <span className="text-gray-300">Verified (Blue Tick)</span>
                             </label>
                           </div>
                         </>
@@ -690,30 +755,30 @@ const Admin: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Capabilities (for agents) */}
+                  {/* Agent Features (for agents) */}
                   {activeTab === 'agents' && (
                     <div className="border-t border-royal-dark-lighter pt-6">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold">Capabilities</h3>
+                        <h3 className="text-lg font-semibold">Features</h3>
                         <button
-                          onClick={addCapability}
+                          onClick={addAgentFeature}
                           className="text-royal-gold hover:text-royal-gold/80"
                         >
                           <Plus className="w-5 h-5" />
                         </button>
                       </div>
                       <div className="space-y-4">
-                        {editingItem.capabilities?.map((capability, index) => (
+                        {editingItem.agent_features?.map((feature, index) => (
                           <div key={index} className="flex items-center space-x-2">
                             <input
                               type="text"
-                              value={capability}
-                              onChange={(e) => updateCapability(index, e.target.value)}
-                              placeholder="Enter capability"
+                              value={feature}
+                              onChange={(e) => updateAgentFeature(index, e.target.value)}
+                              placeholder="Enter feature"
                               className="flex-1 px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
                             />
                             <button
-                              onClick={() => removeCapability(index)}
+                              onClick={() => removeAgentFeature(index)}
                               className="text-gray-400 hover:text-red-500"
                             >
                               <X className="w-5 h-5" />
