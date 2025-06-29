@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Sparkles, Bot, Search, Save, Plus, X, LogOut, Upload, Check } from 'lucide-react';
+import { Sparkles, Bot, Search, Save, Plus, X, LogOut, Upload, Check, Link as LinkIcon } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 interface Feature {
@@ -181,6 +181,16 @@ const Admin: React.FC = () => {
     return null;
   };
 
+  // Convert file to base64 for simple storage
+  const convertToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
   const handleImageUpload = async (file: File) => {
     if (!file) return;
 
@@ -190,33 +200,18 @@ const Admin: React.FC = () => {
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB');
+    // Validate file size (max 2MB for base64)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image size must be less than 2MB');
       return;
     }
 
     setUploadingImage(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `${activeTab}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('images')
-        .upload(filePath, file);
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        toast.error('Failed to upload image');
-        return;
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('images')
-        .getPublicUrl(filePath);
-
-      setEditingItem(prev => prev ? { ...prev, image_url: publicUrl } : null);
+      // Convert to base64 and store directly in the database
+      const base64String = await convertToBase64(file);
+      
+      setEditingItem(prev => prev ? { ...prev, image_url: base64String } : null);
       toast.success('Image uploaded successfully');
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -583,33 +578,42 @@ const Admin: React.FC = () => {
                             </div>
                           )}
                           
-                          {/* Upload Button */}
-                          <div className="flex items-center space-x-4">
-                            <label className="cursor-pointer">
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) handleImageUpload(file);
-                                }}
-                                className="hidden"
-                              />
-                              <div className="flex items-center space-x-2 bg-royal-dark border border-royal-dark-lighter rounded-lg px-4 py-2 hover:border-royal-gold transition-colors">
-                                <Upload className="w-4 h-4" />
-                                <span>{uploadingImage ? 'Uploading...' : 'Upload Image'}</span>
-                              </div>
-                            </label>
+                          {/* Upload Options */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* File Upload */}
+                            <div>
+                              <label className="cursor-pointer block">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleImageUpload(file);
+                                  }}
+                                  className="hidden"
+                                  disabled={uploadingImage}
+                                />
+                                <div className="flex items-center justify-center space-x-2 bg-royal-dark border border-royal-dark-lighter rounded-lg px-4 py-3 hover:border-royal-gold transition-colors">
+                                  <Upload className="w-4 h-4" />
+                                  <span>{uploadingImage ? 'Uploading...' : 'Upload from PC'}</span>
+                                </div>
+                              </label>
+                              <p className="text-xs text-gray-400 mt-1">Max 2MB, JPG/PNG/GIF</p>
+                            </div>
                             
                             {/* URL Input */}
-                            <div className="flex-1">
-                              <input
-                                type="text"
-                                value={editingItem.image_url || ''}
-                                onChange={(e) => setEditingItem({ ...editingItem, image_url: e.target.value })}
-                                placeholder="Or paste image URL"
-                                className="w-full px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
-                              />
+                            <div>
+                              <div className="flex items-center space-x-2 bg-royal-dark border border-royal-dark-lighter rounded-lg px-4 py-3">
+                                <LinkIcon className="w-4 h-4 text-gray-400" />
+                                <input
+                                  type="text"
+                                  value={editingItem.image_url?.startsWith('data:') ? '' : (editingItem.image_url || '')}
+                                  onChange={(e) => setEditingItem({ ...editingItem, image_url: e.target.value })}
+                                  placeholder="Or paste image URL"
+                                  className="flex-1 bg-transparent text-white focus:outline-none"
+                                />
+                              </div>
+                              <p className="text-xs text-gray-400 mt-1">Paste direct image link</p>
                             </div>
                           </div>
                           
