@@ -10,6 +10,7 @@ import ToolDetail from './pages/ToolDetail';
 import CategoryView from './pages/CategoryView';
 import Compare from './pages/Compare';
 import Admin from './pages/Admin';
+import Login from './pages/Login';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import Advertise from './pages/Advertise';
@@ -102,6 +103,7 @@ const App: React.FC = () => {
                 <Route path="/category/:name" element={<CategoryView />} />
                 <Route path="/compare/:tools" element={<Compare />} />
                 <Route path="/admin" element={<Admin />} />
+                <Route path="/login" element={<Login />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/advertise" element={<Advertise />} />

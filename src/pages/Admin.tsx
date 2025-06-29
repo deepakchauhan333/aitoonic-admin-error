@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../context/AuthContext';
-import { Sparkles, Bot, Search, Save, Plus, X } from 'lucide-react';
+import { Sparkles, Bot, Search, Save, Plus, X, LogOut } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 interface Feature {
@@ -46,7 +45,6 @@ interface EditingItem {
 }
 
 const Admin: React.FC = () => {
-  const { session } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'tools' | 'categories' | 'agents'>('tools');
   const [items, setItems] = useState<EditingItem[]>([]);
@@ -56,24 +54,27 @@ const Admin: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [categories, setCategories] = useState<EditingItem[]>([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // Check authentication
+  // Check admin authentication
   useEffect(() => {
-    if (!session) {
+    const adminLoggedIn = localStorage.getItem('adminLoggedIn');
+    if (adminLoggedIn === 'true') {
+      setIsLoggedIn(true);
+    } else {
       toast.error('Please log in to access the admin panel');
       navigate('/login');
-      return;
     }
-  }, [session, navigate]);
+  }, [navigate]);
 
   useEffect(() => {
-    if (session) {
+    if (isLoggedIn) {
       fetchItems();
       if (activeTab === 'tools') {
         fetchCategories();
       }
     }
-  }, [activeTab, session]);
+  }, [activeTab, isLoggedIn]);
 
   useEffect(() => {
     // Filter items based on search term
@@ -87,6 +88,13 @@ const Admin: React.FC = () => {
       setFilteredItems(filtered);
     }
   }, [searchTerm, items]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('adminLoggedIn');
+    localStorage.removeItem('adminUser');
+    toast.success('Logged out successfully');
+    navigate('/login');
+  };
 
   const fetchCategories = async () => {
     try {
@@ -315,7 +323,7 @@ const Admin: React.FC = () => {
   };
 
   // Don't render the admin panel if not authenticated
-  if (!session) {
+  if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-royal-dark flex items-center justify-center">
         <Toaster position="top-right" />
@@ -333,33 +341,42 @@ const Admin: React.FC = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold gradient-text">Admin Dashboard</h1>
-          <div className="flex space-x-4">
+          <div className="flex items-center space-x-4">
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setActiveTab('tools')}
+                className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
+                  activeTab === 'tools' ? 'bg-royal-gold text-royal-dark' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Search className="w-5 h-5" />
+                <span>Tools</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('categories')}
+                className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
+                  activeTab === 'categories' ? 'bg-royal-gold text-royal-dark' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Sparkles className="w-5 h-5" />
+                <span>Categories</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('agents')}
+                className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
+                  activeTab === 'agents' ? 'bg-royal-gold text-royal-dark' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Bot className="w-5 h-5" />
+                <span>Agents</span>
+              </button>
+            </div>
             <button
-              onClick={() => setActiveTab('tools')}
-              className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
-                activeTab === 'tools' ? 'bg-royal-gold text-royal-dark' : 'text-gray-400 hover:text-white'
-              }`}
+              onClick={handleLogout}
+              className="px-4 py-2 rounded-lg flex items-center space-x-2 text-gray-400 hover:text-red-500 transition-colors"
             >
-              <Search className="w-5 h-5" />
-              <span>Tools</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('categories')}
-              className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
-                activeTab === 'categories' ? 'bg-royal-gold text-royal-dark' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <Sparkles className="w-5 h-5" />
-              <span>Categories</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('agents')}
-              className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
-                activeTab === 'agents' ? 'bg-royal-gold text-royal-dark' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <Bot className="w-5 h-5" />
-              <span>Agents</span>
+              <LogOut className="w-5 h-5" />
+              <span>Logout</span>
             </button>
           </div>
         </div>
