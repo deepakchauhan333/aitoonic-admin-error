@@ -52,7 +52,7 @@ function ToolDetail() {
           .select('*, categories!inner(*)')
           .ilike('name', slug?.replace(/-/g, ' ') || '')
           .single();
-      
+
         if (toolData) {
           setTool(toolData);
           setCategory(toolData.categories);
@@ -75,7 +75,7 @@ function ToolDetail() {
         setLoading(false);
       }
     }
-    
+
     fetchData();
   }, [slug]);
 
@@ -94,7 +94,7 @@ function ToolDetail() {
           <div className="text-center">
             <h1 className="text-3xl font-bold text-white mb-4">Tool Not Found</h1>
             <p className="text-gray-400 mb-8">The tool you're looking for doesn't exist or has been removed.</p>
-            <Link 
+            <Link
               to="/categories"
               className="inline-flex items-center text-royal-gold hover:text-royal-gold/80"
             >
@@ -111,8 +111,8 @@ function ToolDetail() {
     <>
       {tool && (
         <SEO
-          title={tool.seo_title || tool.name}  // Set title based on seo_title or tool.name
-          description={tool.seo_description || tool.description}  // Set description based on seo_description or tool.description
+          title={tool.seo_title || tool.name}
+          description={tool.seo_description || tool.description}
           image={tool.image_url}
           type="product"
           schema={generateToolSchema(tool)}
@@ -192,13 +192,17 @@ function ToolDetail() {
                   </div>
                   <p className="text-gray-300 text-lg">{tool.description}</p>
                 </div>
-                {tool.pricing && tool.pricing.length > 0 && (
+
+                {/* Render Pricing */}
+                {tool.pricing && tool.pricing.length > 0 ? (
                   <div className="flex items-center space-x-2 bg-royal-dark rounded-full px-4 py-2">
                     <DollarSign className="w-5 h-5 text-royal-gold" />
                     <span className="text-royal-gold font-medium">
                       {tool.pricing[0].price}
                     </span>
                   </div>
+                ) : (
+                  <p className="text-gray-400">Pricing not available</p>  {/* Fallback message */}
                 )}
               </div>
 
