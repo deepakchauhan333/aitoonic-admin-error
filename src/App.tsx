@@ -18,6 +18,7 @@ import Affiliate from './pages/Affiliate';
 import Contact from './pages/Contact';
 import About from './pages/About';
 import Sitemap from './pages/Sitemap';
+import DynamicSitemap from './pages/DynamicSitemap';
 import NotFound from './pages/NotFound';
 import { AuthProvider } from './context/AuthContext';
 import { ScrollToTop } from './components/ScrollToTop';
@@ -111,6 +112,7 @@ const App: React.FC = () => {
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/sitemap" element={<Sitemap />} />
+                <Route path="/api/sitemap/:type.xml" element={<DynamicSitemap />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Star, Bot, ExternalLink, ChevronRight, DollarSign } from 'lucide-react';
+import { Star, Bot, ExternalLink, ChevronRight, DollarSign, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { SEO } from '../components/SEO';
 import { generateToolSchema } from '../utils/schema';
@@ -111,8 +111,8 @@ function ToolDetail() {
     <>
       {tool && (
         <SEO
-          title={tool.seo_title || tool.name}  // Set title based on seo_title or tool.name
-          description={tool.seo_description || tool.description}  // Set description based on seo_description or tool.description
+          title={tool.seo_title || tool.name}
+          description={tool.seo_description || tool.description}
           image={tool.image_url}
           type="product"
           schema={generateToolSchema(tool)}
@@ -227,7 +227,7 @@ function ToolDetail() {
             </div>
           </div>
 
-          {/* Features and Use Cases */}
+          {/* Features, Use Cases, and Pricing */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
             <div className="lg:col-span-2 space-y-8">
               {/* Features */}
@@ -259,6 +259,84 @@ function ToolDetail() {
                           <p className="text-gray-400">{useCase.description}</p>
                         </div>
                       </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Pricing Section */}
+            <div className="lg:col-span-1">
+              {tool.pricing && tool.pricing.length > 0 && (
+                <div className="bg-royal-dark-card rounded-2xl p-4 sm:p-8 border border-royal-dark-lighter">
+                  <h2 className="text-2xl font-bold mb-6">Pricing Plans</h2>
+                  <div className="space-y-6">
+                    {tool.pricing.map((plan, index) => (
+                      <div
+                        key={index}
+                        className={`bg-royal-dark rounded-lg p-6 border ${
+                          index === 1 ? 'border-royal-gold' : 'border-royal-dark-lighter'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-bold text-white">{plan.plan}</h3>
+                          <span className="text-royal-gold font-semibold text-xl">{plan.price}</span>
+                        </div>
+                        <ul className="space-y-3">
+                          {plan.features.map((feature, i) => (
+                            <li key={i} className="flex items-center text-gray-300">
+                              <Check className="w-4 h-4 text-green-500 mr-3 flex-shrink-0" />
+                              <span className="text-sm">{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        {tool.url && (
+                          <a
+                            href={tool.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`w-full mt-4 inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-all ${
+                              index === 1
+                                ? 'bg-royal-gold text-royal-dark hover:bg-opacity-90'
+                                : 'border border-royal-gold text-royal-gold hover:bg-royal-gold hover:text-royal-dark'
+                            }`}
+                          >
+                            Get Started
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Similar Tools */}
+              {similarTools.length > 0 && (
+                <div className="bg-royal-dark-card rounded-2xl p-4 sm:p-8 border border-royal-dark-lighter mt-8">
+                  <h2 className="text-2xl font-bold mb-6">Similar Tools</h2>
+                  <div className="space-y-4">
+                    {similarTools.map((similarTool) => (
+                      <Link
+                        key={similarTool.id}
+                        to={`/ai/${similarTool.name.toLowerCase().replace(/\s+/g, '-')}`}
+                        className="group block"
+                      >
+                        <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-royal-dark/50 transition-colors">
+                          <img
+                            src={similarTool.image_url || 'https://i.imgur.com/ZXqf6Kx.png'}
+                            alt={similarTool.name}
+                            className="w-12 h-12 rounded-lg object-cover"
+                          />
+                          <div>
+                            <h3 className="font-semibold text-white group-hover:text-royal-gold transition-colors">
+                              {similarTool.name}
+                            </h3>
+                            <p className="text-sm text-gray-400 line-clamp-1">
+                              {similarTool.description}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
                     ))}
                   </div>
                 </div>

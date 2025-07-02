@@ -13,12 +13,13 @@ const corsHeaders = {
 };
 
 function generateSitemapIndex(sitemaps: string[]): string {
+  const currentDate = new Date().toISOString();
   return `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   ${sitemaps.map(sitemap => `
   <sitemap>
-    <loc>https://aitoonic.com/sitemap/${sitemap}.xml</loc>
-    <lastmod>${new Date().toISOString()}</lastmod>
+    <loc>https://aitoonic.com/api/sitemap/${sitemap}.xml</loc>
+    <lastmod>${currentDate}</lastmod>
   </sitemap>`).join('')}
 </sitemapindex>`;
 }
@@ -48,7 +49,7 @@ Deno.serve(async (req) => {
     switch (path) {
       case 'index': {
         // Main sitemap index
-        const sitemaps = ['main', 'tools', 'categories', 'agents', 'search'];
+        const sitemaps = ['main', 'tools', 'categories', 'agents'];
         return new Response(generateSitemapIndex(sitemaps), { headers: corsHeaders });
       }
 
@@ -88,11 +89,11 @@ Deno.serve(async (req) => {
         // Categories sitemap
         const { data: categories } = await supabase
           .from('categories')
-          .select('name, created_at');
+          .select('name, created_at, updated_at');
 
         const urls = categories?.map(category => ({
           loc: `https://aitoonic.com/category/${category.name.toLowerCase().replace(/\s+/g, '-')}`,
-          lastmod: category.created_at,
+          lastmod: category.updated_at || category.created_at,
           changefreq: 'weekly',
           priority: '0.8'
         })) || [];
@@ -104,12 +105,12 @@ Deno.serve(async (req) => {
         // Agents sitemap
         const { data: agents } = await supabase
           .from('agents')
-          .select('name, created_at')
+          .select('name, created_at, updated_at')
           .eq('status', 'active');
 
         const urls = agents?.map(agent => ({
           loc: `https://aitoonic.com/ai-agent/${agent.name.toLowerCase().replace(/\s+/g, '-')}`,
-          lastmod: agent.created_at,
+          lastmod: agent.updated_at || agent.created_at,
           changefreq: 'weekly',
           priority: '0.8'
         })) || [];
@@ -117,26 +118,8 @@ Deno.serve(async (req) => {
         return new Response(generateUrlset(urls), { headers: corsHeaders });
       }
 
-      case 'search': {
-        // Search pages sitemap
-        const { data: searchTerms } = await supabase
-          .from('search_terms')
-          .select('term, created_at')
-          .order('count', { ascending: false })
-          .limit(1000);
-
-        const urls = searchTerms?.map(term => ({
-          loc: `https://aitoonic.com/s/${encodeURIComponent(term.term)}`,
-          lastmod: term.created_at,
-          changefreq: 'weekly',
-          priority: '0.6'
-        })) || [];
-
-        return new Response(generateUrlset(urls), { headers: corsHeaders });
-      }
-
       default:
-        return new Response('Not found', { status: 404 });
+        return new Response('Sitemap not found', { status: 404 });
     }
   } catch (error) {
     console.error('Error generating sitemap:', error);
