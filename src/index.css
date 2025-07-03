@@ -3,6 +3,22 @@
 @tailwind utilities;
 
 :root {
+  /* Main Colors */
+  --primary: #0ea5e9;
+  --primary-dark: #0284c7;
+  --secondary: #eab308;
+  --secondary-dark: #ca8a04;
+  
+  /* Sub Colors */
+  --accent: #64748b;
+  --success: #22c55e;
+  
+  /* Background Colors */
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-card: #334155;
+  
+  /* Legacy colors for backward compatibility */
   --royal-blue: #0B1437;
   --royal-purple: #1B0B37;
   --royal-gold: #C6A355;
@@ -25,11 +41,12 @@ html, body {
 }
 
 body {
-  background-color: var(--dark-bg);
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
   color: #ffffff;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
 }
 
 /* Container max-width and padding */
@@ -42,23 +59,83 @@ body {
 }
 
 .gradient-text {
-  background: linear-gradient(45deg, var(--royal-gold), #E5C17C);
+  background: linear-gradient(45deg, var(--primary), var(--secondary));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-.royal-gradient {
-  background: linear-gradient(135deg, var(--royal-purple), var(--royal-blue));
-}
-
 .card-hover {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition: all 0.3s ease;
 }
 
 .card-hover:hover {
   transform: translateY(-5px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 40px rgba(14, 165, 233, 0.15);
+}
+
+/* Button Styles */
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(14, 165, 233, 0.3);
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, var(--secondary), var(--secondary-dark));
+  color: var(--bg-primary);
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(234, 179, 8, 0.3);
+}
+
+/* Card Styles */
+.card {
+  background: rgba(51, 65, 85, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 1rem;
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 20px 40px rgba(14, 165, 233, 0.1);
+}
+
+/* Aspect Ratio Utilities */
+.aspect-16-9 {
+  aspect-ratio: 16 / 9;
+}
+
+.aspect-square {
+  aspect-ratio: 1 / 1;
+}
+
+/* Image Styles */
+.image-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 
 /* TipTap Editor Styles */
@@ -82,14 +159,14 @@ body {
 }
 
 .ProseMirror blockquote {
-  border-left: 4px solid var(--royal-gold);
+  border-left: 4px solid var(--primary);
   padding-left: 1rem;
   margin: 1rem 0;
   color: #999;
 }
 
 .ProseMirror pre {
-  background: var(--dark-bg);
+  background: var(--bg-primary);
   border-radius: 0.5rem;
   padding: 1rem;
   margin: 1rem 0;
@@ -114,7 +191,7 @@ body {
 }
 
 .ProseMirror a {
-  color: var(--royal-gold);
+  color: var(--primary);
   text-decoration: underline;
 }
 
@@ -147,4 +224,32 @@ table {
     word-wrap: break-word;
     overflow-wrap: break-word;
   }
+}
+
+/* Loading animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Focus styles for accessibility */
+button:focus,
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }

@@ -171,22 +171,22 @@ function Home() {
         keywords="AI tools, artificial intelligence, machine learning, AI websites, AI software, AI directory"
       />
 
-      <div className="min-h-screen bg-royal-dark">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         {/* Header Section */}
-        <section className="py-12 bg-royal-dark">
+        <section className="py-16 bg-gradient-to-r from-primary-900/20 to-secondary-900/20">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto text-center">
-              <h1 className="text-4xl md:text-5xl font-bold mb-4 gradient-text">
+              <h1 className="text-4xl md:text-6xl font-bold mb-6 gradient-text">
                 Discover The Best AI Websites & Tools
               </h1>
-              <p className="text-lg text-gray-300 mb-8">
+              <p className="text-xl text-slate-300 mb-8">
                 Discover the best AI tools directory. AI tools list & GPTs store are updated daily by ChatGPT.
               </p>
 
               {/* Search Bar */}
               <div className="max-w-2xl mx-auto mb-8">
                 <div id="search-container" className="relative">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
                   <input
                     type="text"
                     placeholder="Search AI Tools, Video Translation or Tool"
@@ -196,27 +196,27 @@ function Home() {
                       setShowResults(true);
                     }}
                     onFocus={() => setShowResults(true)}
-                    className="w-full pl-12 pr-16 py-4 bg-white border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-blue-500 text-base"
+                    className="w-full pl-12 pr-16 py-4 bg-white/95 backdrop-blur-sm border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-base shadow-lg"
                   />
-                  <button className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                  <button className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition-colors">
                     <Search className="w-4 h-4" />
                   </button>
 
                   {/* Search Results Dropdown */}
                   {showResults && searchResults.length > 0 && (
-                    <div className="absolute left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden max-h-96 overflow-y-auto z-50">
+                    <div className="absolute left-0 right-0 mt-2 bg-white/95 backdrop-blur-sm border border-slate-200 rounded-xl shadow-2xl overflow-hidden max-h-96 overflow-y-auto z-50">
                       {searchResults.map((result, index) => (
                         <button
                           key={`${result.type}-${index}`}
-                          className="w-full px-4 py-3 flex items-center space-x-3 hover:bg-gray-50 transition-colors text-left"
+                          className="w-full px-4 py-3 flex items-center space-x-3 hover:bg-primary-50 transition-colors text-left"
                           onClick={() => handleResultClick(result)}
                         >
-                          <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
+                          <div className="w-8 h-8 bg-primary-100 rounded flex items-center justify-center">
                             {result.type === 'tool' ? '🔧' : '📁'}
                           </div>
                           <div>
-                            <h4 className="text-gray-900 font-medium">{result.item.name}</h4>
-                            <p className="text-sm text-gray-500 line-clamp-1">
+                            <h4 className="text-slate-900 font-medium">{result.item.name}</h4>
+                            <p className="text-sm text-slate-500 line-clamp-1">
                               {result.item.description}
                             </p>
                           </div>
@@ -238,10 +238,10 @@ function Home() {
                   <button
                     key={key}
                     onClick={() => setActiveFilter(key as any)}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    className={`flex items-center space-x-2 px-6 py-3 rounded-full text-sm font-medium transition-all ${
                       activeFilter === key
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25'
+                        : 'bg-white/10 backdrop-blur-sm text-slate-300 hover:bg-white/20 border border-white/20'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -255,34 +255,36 @@ function Home() {
 
         {/* Today's Tools Section */}
         {filteredTools.length > 0 && (
-          <section className="py-12 bg-gray-50">
+          <section className="py-16 bg-slate-800/50">
             <div className="container mx-auto px-4">
-              <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">
+              <h2 className="text-3xl font-bold text-white mb-8 text-center">
                 {activeFilter === 'today' && 'Today\'s New Tools'}
                 {activeFilter === 'new' && 'Latest AI Tools'}
                 {activeFilter === 'saved' && 'Most Saved Tools'}
                 {activeFilter === 'used' && 'Most Used Tools'}
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
                 {filteredTools.slice(0, 12).map((tool) => (
                   <Link
                     key={tool.id}
                     to={`/ai/${tool.name.toLowerCase().replace(/\s+/g, '-')}`}
-                    className="group bg-white rounded-lg p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all"
+                    className="group card card-hover"
                   >
-                    <div className="aspect-square mb-3 overflow-hidden rounded-lg">
+                    <div className="aspect-16-9 rounded-t-xl overflow-hidden">
                       <img
-                        src={tool.image_url || 'https://via.placeholder.com/100'}
+                        src={tool.image_url || 'https://via.placeholder.com/400x225'}
                         alt={tool.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        className="image-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     </div>
-                    <h3 className="font-semibold text-gray-900 text-sm mb-1 line-clamp-1">
-                      {tool.name}
-                    </h3>
-                    <p className="text-xs text-gray-500 line-clamp-2">
-                      {tool.description}
-                    </p>
+                    <div className="p-4">
+                      <h3 className="font-semibold text-white text-sm mb-2 line-clamp-1 group-hover:text-primary-400 transition-colors">
+                        {tool.name}
+                      </h3>
+                      <p className="text-xs text-slate-400 line-clamp-2">
+                        {tool.description}
+                      </p>
+                    </div>
                   </Link>
                 ))}
               </div>
@@ -291,7 +293,7 @@ function Home() {
         )}
 
         {/* Categories Section */}
-        <section className="py-12 bg-white">
+        <section className="py-16 bg-slate-900/50">
           <div className="container mx-auto px-4">
             {categories.map((category) => {
               // Get tools for this category
@@ -300,43 +302,45 @@ function Home() {
               if (categoryTools.length === 0) return null;
 
               return (
-                <div key={category.id} className="mb-16">
-                  <div className="flex items-center justify-between mb-6">
+                <div key={category.id} className="mb-20">
+                  <div className="flex items-center justify-between mb-8">
                     <div>
-                      <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                      <h2 className="text-3xl font-bold text-white mb-2">
                         {category.name}
                       </h2>
-                      <p className="text-gray-600">{category.description}</p>
+                      <p className="text-slate-400">{category.description}</p>
                     </div>
                     <Link
                       to={`/category/${category.name.toLowerCase().replace(/\s+/g, '-')}`}
-                      className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 font-medium"
+                      className="flex items-center space-x-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all hover:shadow-lg hover:shadow-primary-500/25"
                     >
                       <span>View All ({category.tool_count})</span>
                       <ChevronRight className="w-4 h-4" />
                     </Link>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
                     {categoryTools.slice(0, 12).map((tool) => (
                       <Link
                         key={tool.id}
                         to={`/ai/${tool.name.toLowerCase().replace(/\s+/g, '-')}`}
-                        className="group bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all"
+                        className="group card card-hover"
                       >
-                        <div className="aspect-square mb-3 overflow-hidden rounded-lg">
+                        <div className="aspect-16-9 rounded-t-xl overflow-hidden">
                           <img
-                            src={tool.image_url || 'https://via.placeholder.com/100'}
+                            src={tool.image_url || 'https://via.placeholder.com/400x225'}
                             alt={tool.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            className="image-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         </div>
-                        <h3 className="font-semibold text-gray-900 text-sm mb-1 line-clamp-1">
-                          {tool.name}
-                        </h3>
-                        <p className="text-xs text-gray-500 line-clamp-2">
-                          {tool.description}
-                        </p>
+                        <div className="p-4">
+                          <h3 className="font-semibold text-white text-sm mb-2 line-clamp-1 group-hover:text-primary-400 transition-colors">
+                            {tool.name}
+                          </h3>
+                          <p className="text-xs text-slate-400 line-clamp-2">
+                            {tool.description}
+                          </p>
+                        </div>
                       </Link>
                     ))}
                   </div>
@@ -347,22 +351,22 @@ function Home() {
         </section>
 
         {/* Newsletter Section */}
-        <section className="py-16 bg-royal-dark">
+        <section className="py-20 bg-gradient-to-r from-primary-900/30 to-secondary-900/30">
           <div className="container mx-auto px-4">
             <div className="max-w-2xl mx-auto text-center">
-              <h2 className="text-3xl font-bold mb-4 gradient-text">Stay Updated</h2>
-              <p className="text-gray-300 mb-8">
+              <h2 className="text-4xl font-bold mb-4 gradient-text">Stay Updated</h2>
+              <p className="text-slate-300 mb-8 text-lg">
                 Get the latest AI tools and insights delivered to your inbox
               </p>
               <form className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
                 <input
                   type="email"
                   placeholder="Enter your email"
-                  className="flex-1 px-6 py-3 rounded-lg bg-white border border-gray-200 text-gray-900 focus:outline-none focus:border-blue-500"
+                  className="flex-1 px-6 py-4 rounded-xl bg-white/95 backdrop-blur-sm border border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
                 <button
                   type="submit"
-                  className="w-full sm:w-auto bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 whitespace-nowrap transition-colors"
+                  className="w-full sm:w-auto bg-primary-500 hover:bg-primary-600 text-white px-8 py-4 rounded-xl font-medium whitespace-nowrap transition-all hover:shadow-lg hover:shadow-primary-500/25"
                 >
                   Subscribe
                 </button>

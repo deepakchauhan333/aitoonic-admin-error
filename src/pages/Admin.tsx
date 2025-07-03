@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Sparkles, Bot, Search, Save, Plus, X, LogOut, Upload, Check, Link as LinkIcon } from 'lucide-react';
+import { Sparkles, Bot, Search, Save, Plus, X, LogOut, Upload, Check, Link as LinkIcon, FileText } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 interface Feature {
@@ -29,7 +29,7 @@ interface EditingItem {
   features?: Feature[];
   useCases?: UseCase[];
   pricing?: PricingPlan[];
-  type?: 'tool' | 'category' | 'agent';
+  type?: 'tool' | 'category' | 'agent' | 'how-to-use';
   image_url?: string;
   image_alt?: string;
   url?: string;
@@ -45,12 +45,15 @@ interface EditingItem {
   is_featured?: boolean;
   is_verified?: boolean;
   agent_features?: string[];
+  title?: string;
+  content?: string;
+  is_active?: boolean;
   [key: string]: any;
 }
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'tools' | 'categories' | 'agents'>('tools');
+  const [activeTab, setActiveTab] = useState<'tools' | 'categories' | 'agents' | 'how-to-use'>('tools');
   const [items, setItems] = useState<EditingItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<EditingItem[]>([]);
   const [editingItem, setEditingItem] = useState<EditingItem | null>(null);
@@ -108,6 +111,7 @@ const Admin: React.FC = () => {
     } else {
       const filtered = items.filter(item =>
         item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.description?.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredItems(filtered);
@@ -148,8 +152,9 @@ const Admin: React.FC = () => {
   const fetchItems = async () => {
     setLoading(true);
     try {
+      const tableName = activeTab === 'how-to-use' ? 'how_to_use' : activeTab;
       const { data: items, error } = await supabase
-        .from(activeTab)
+        .from(tableName)
         .select('*')
         .order('created_at', { ascending: false });
       
@@ -170,6 +175,12 @@ const Admin: React.FC = () => {
   };
 
   const validateForm = (item: EditingItem): string | null => {
+    if (activeTab === 'how-to-use') {
+      if (!item.title?.trim()) return 'Title is required';
+      if (!item.content?.trim()) return 'Content is required';
+      return null;
+    }
+
     if (!item.name?.trim()) return 'Name is required';
     if (!item.description?.trim()) return 'Description is required';
     
@@ -233,48 +244,60 @@ const Admin: React.FC = () => {
 
     setSaving(true);
     try {
+      const tableName = activeTab === 'how-to-use' ? 'how_to_use' : activeTab;
+      
       // Prepare base data
-      let dataToSave: any = {
-        name: editingItem.name?.trim(),
-        description: editingItem.description?.trim(),
-        seo_title: editingItem.seo_title?.trim() || null,
-        seo_description: editingItem.seo_description?.trim() || null,
-        image_url: editingItem.image_url?.trim() || null,
-        image_alt: editingItem.image_alt?.trim() || null,
-      };
+      let dataToSave: any = {};
 
-      // Add specific fields based on type
-      if (activeTab === 'tools') {
+      if (activeTab === 'how-to-use') {
         dataToSave = {
-          ...dataToSave,
-          url: editingItem.url?.trim(),
-          category_id: editingItem.category_id,
-          features: editingItem.features || [],
-          useCases: editingItem.useCases || [],
-          pricing: editingItem.pricing || []
+          title: editingItem.title?.trim(),
+          content: editingItem.content?.trim(),
+          is_active: editingItem.is_active !== false,
         };
-      } else if (activeTab === 'agents') {
+      } else {
         dataToSave = {
-          ...dataToSave,
-          agent_features: editingItem.agent_features?.filter(feature => feature.trim()) || [],
-          is_featured: editingItem.is_featured || false,
-          is_verified: editingItem.is_verified || false,
-          pricing_type: editingItem.pricing_type || 'free'
+          name: editingItem.name?.trim(),
+          description: editingItem.description?.trim(),
+          seo_title: editingItem.seo_title?.trim() || null,
+          seo_description: editingItem.seo_description?.trim() || null,
+          image_url: editingItem.image_url?.trim() || null,
+          image_alt: editingItem.image_alt?.trim() || null,
         };
+
+        // Add specific fields based on type
+        if (activeTab === 'tools') {
+          dataToSave = {
+            ...dataToSave,
+            url: editingItem.url?.trim(),
+            category_id: editingItem.category_id,
+            features: editingItem.features || [],
+            useCases: editingItem.useCases || [],
+            pricing: editingItem.pricing || []
+          };
+        } else if (activeTab === 'agents') {
+          dataToSave = {
+            ...dataToSave,
+            agent_features: editingItem.agent_features?.filter(feature => feature.trim()) || [],
+            is_featured: editingItem.is_featured || false,
+            is_verified: editingItem.is_verified || false,
+            pricing_type: editingItem.pricing_type || 'free'
+          };
+        }
       }
 
       let result;
       if (editingItem.id) {
         // Update existing item
         result = await supabase
-          .from(activeTab)
+          .from(tableName)
           .update(dataToSave)
           .eq('id', editingItem.id)
           .select();
       } else {
         // Insert new item
         result = await supabase
-          .from(activeTab)
+          .from(tableName)
           .insert([dataToSave])
           .select();
       }
@@ -285,7 +308,7 @@ const Admin: React.FC = () => {
         return;
       }
 
-      toast.success(`${activeTab.slice(0, -1)} saved successfully!`);
+      toast.success(`${activeTab.replace('-', ' ')} saved successfully!`);
       fetchItems();
       setEditingItem(null);
     } catch (error) {
@@ -391,18 +414,18 @@ const Admin: React.FC = () => {
   // Don't render the admin panel if not authenticated
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-royal-dark flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <Toaster position="top-right" />
         <div className="text-center">
           <h1 className="text-2xl font-bold text-white mb-4">Authentication Required</h1>
-          <p className="text-gray-400">Please log in to access the admin panel.</p>
+          <p className="text-slate-400">Please log in to access the admin panel.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-royal-dark py-12">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-12">
       <Toaster position="top-right" />
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between mb-8">
@@ -411,8 +434,8 @@ const Admin: React.FC = () => {
             <div className="flex space-x-4">
               <button
                 onClick={() => setActiveTab('tools')}
-                className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
-                  activeTab === 'tools' ? 'bg-royal-gold text-royal-dark' : 'text-gray-400 hover:text-white'
+                className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-all ${
+                  activeTab === 'tools' ? 'bg-primary-500 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
                 }`}
               >
                 <Search className="w-5 h-5" />
@@ -420,8 +443,8 @@ const Admin: React.FC = () => {
               </button>
               <button
                 onClick={() => setActiveTab('categories')}
-                className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
-                  activeTab === 'categories' ? 'bg-royal-gold text-royal-dark' : 'text-gray-400 hover:text-white'
+                className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-all ${
+                  activeTab === 'categories' ? 'bg-primary-500 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
                 }`}
               >
                 <Sparkles className="w-5 h-5" />
@@ -429,20 +452,29 @@ const Admin: React.FC = () => {
               </button>
               <button
                 onClick={() => setActiveTab('agents')}
-                className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
-                  activeTab === 'agents' ? 'bg-royal-gold text-royal-dark' : 'text-gray-400 hover:text-white'
+                className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-all ${
+                  activeTab === 'agents' ? 'bg-primary-500 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
                 }`}
               >
                 <Bot className="w-5 h-5" />
                 <span>Agents</span>
               </button>
+              <button
+                onClick={() => setActiveTab('how-to-use')}
+                className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-all ${
+                  activeTab === 'how-to-use' ? 'bg-primary-500 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                }`}
+              >
+                <FileText className="w-5 h-5" />
+                <span>How to Use</span>
+              </button>
             </div>
-            <div className="flex items-center space-x-2 text-gray-400">
+            <div className="flex items-center space-x-2 text-slate-400">
               <span className="text-sm">Welcome, {user?.email}</span>
             </div>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 rounded-lg flex items-center space-x-2 text-gray-400 hover:text-red-500 transition-colors"
+              className="px-4 py-2 rounded-lg flex items-center space-x-2 text-slate-400 hover:text-red-500 transition-colors"
             >
               <LogOut className="w-5 h-5" />
               <span>Logout</span>
@@ -452,12 +484,12 @@ const Admin: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Items List */}
-          <div className="md:col-span-1 bg-royal-dark-card rounded-xl p-6 border border-royal-dark-lighter">
+          <div className="md:col-span-1 card p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold">Items</h2>
               <button
-                onClick={() => setEditingItem({ type: activeTab.slice(0, -1) as any })}
-                className="p-2 text-royal-gold hover:bg-royal-dark rounded-lg transition-colors"
+                onClick={() => setEditingItem({ type: activeTab.replace('-', '_') as any })}
+                className="p-2 text-primary-500 hover:bg-slate-700 rounded-lg transition-colors"
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -465,18 +497,18 @@ const Admin: React.FC = () => {
 
             {/* Search Input */}
             <div className="relative mb-6">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input
                 type="text"
                 placeholder={`Search ${activeTab}...`}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold text-sm"
+                className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500 text-sm"
               />
             </div>
 
             {loading ? (
-              <div className="text-center text-gray-400">Loading...</div>
+              <div className="text-center text-slate-400">Loading...</div>
             ) : (
               <div className="space-y-4 max-h-96 overflow-y-auto">
                 {filteredItems.map((item) => (
@@ -485,21 +517,21 @@ const Admin: React.FC = () => {
                     onClick={() => setEditingItem(item)}
                     className={`w-full text-left p-4 rounded-lg transition-colors ${
                       editingItem?.id === item.id
-                        ? 'bg-royal-gold/10 border border-royal-gold'
-                        : 'bg-royal-dark hover:bg-royal-dark-lighter'
+                        ? 'bg-primary-500/20 border border-primary-500'
+                        : 'bg-slate-700 hover:bg-slate-600'
                     }`}
                   >
                     <div className="flex items-center space-x-2">
-                      <h3 className="font-medium text-white">{item.name}</h3>
+                      <h3 className="font-medium text-white">{item.name || item.title}</h3>
                       {activeTab === 'agents' && item.is_verified && (
                         <Check className="w-4 h-4 text-blue-500" />
                       )}
                     </div>
-                    <p className="text-sm text-gray-400 line-clamp-2">{item.description}</p>
+                    <p className="text-sm text-slate-400 line-clamp-2">{item.description}</p>
                   </button>
                 ))}
                 {filteredItems.length === 0 && (
-                  <div className="text-center text-gray-400 py-8">
+                  <div className="text-center text-slate-400 py-8">
                     {searchTerm ? 'No items found matching your search' : 'No items found'}
                   </div>
                 )}
@@ -510,7 +542,7 @@ const Admin: React.FC = () => {
           {/* Edit Form */}
           <div className="md:col-span-2">
             {editingItem && (
-              <div className="bg-royal-dark-card rounded-xl p-6 border border-royal-dark-lighter">
+              <div className="card p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-bold">
                     {editingItem.id ? 'Edit Item' : 'New Item'}
@@ -518,9 +550,9 @@ const Admin: React.FC = () => {
                   <button
                     onClick={handleSave}
                     disabled={saving}
-                    className="flex items-center space-x-2 bg-royal-gold text-royal-dark px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors disabled:opacity-50"
+                    className="btn-primary disabled:opacity-50"
                   >
-                    <Save className="w-5 h-5" />
+                    <Save className="w-5 h-5 mr-2" />
                     <span>{saving ? 'Saving...' : 'Save & Publish'}</span>
                   </button>
                 </div>
@@ -530,243 +562,292 @@ const Admin: React.FC = () => {
                   <div>
                     <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
                     <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={editingItem.name || ''}
-                          onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                          className="w-full px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Description *
-                        </label>
-                        <textarea
-                          value={editingItem.description || ''}
-                          onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-                          rows={3}
-                          className="w-full px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
-                          required
-                        />
-                      </div>
-
-                      {/* Image Upload Section */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Image
-                        </label>
-                        <div className="space-y-4">
-                          {/* Current Image Preview */}
-                          {editingItem.image_url && (
-                            <div className="relative">
-                              <img
-                                src={editingItem.image_url}
-                                alt="Preview"
-                                className="w-32 h-32 object-cover rounded-lg border border-royal-dark-lighter"
-                              />
-                              <button
-                                onClick={() => setEditingItem({ ...editingItem, image_url: '' })}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          )}
-                          
-                          {/* Upload Options */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* File Upload */}
-                            <div>
-                              <label className="cursor-pointer block">
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) handleImageUpload(file);
-                                  }}
-                                  className="hidden"
-                                  disabled={uploadingImage}
-                                />
-                                <div className="flex items-center justify-center space-x-2 bg-royal-dark border border-royal-dark-lighter rounded-lg px-4 py-3 hover:border-royal-gold transition-colors">
-                                  <Upload className="w-4 h-4" />
-                                  <span>{uploadingImage ? 'Uploading...' : 'Upload from PC'}</span>
-                                </div>
-                              </label>
-                              <p className="text-xs text-gray-400 mt-1">Max 2MB, JPG/PNG/GIF</p>
-                            </div>
-                            
-                            {/* URL Input */}
-                            <div>
-                              <div className="flex items-center space-x-2 bg-royal-dark border border-royal-dark-lighter rounded-lg px-4 py-3">
-                                <LinkIcon className="w-4 h-4 text-gray-400" />
-                                <input
-                                  type="text"
-                                  value={editingItem.image_url?.startsWith('data:') ? '' : (editingItem.image_url || '')}
-                                  onChange={(e) => setEditingItem({ ...editingItem, image_url: e.target.value })}
-                                  placeholder="Or paste image URL"
-                                  className="flex-1 bg-transparent text-white focus:outline-none"
-                                />
-                              </div>
-                              <p className="text-xs text-gray-400 mt-1">Paste direct image link</p>
-                            </div>
-                          </div>
-                          
-                          {/* Image Alt Text */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Image Alt Text
-                            </label>
-                            <input
-                              type="text"
-                              value={editingItem.image_alt || ''}
-                              onChange={(e) => setEditingItem({ ...editingItem, image_alt: e.target.value })}
-                              placeholder="Describe the image for accessibility"
-                              className="w-full px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Tool-specific fields */}
-                      {activeTab === 'tools' && (
+                      {activeTab === 'how-to-use' ? (
                         <>
                           <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Tool URL *
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                              Title *
                             </label>
                             <input
                               type="text"
-                              value={editingItem.url || ''}
-                              onChange={(e) => setEditingItem({ ...editingItem, url: e.target.value })}
-                              className="w-full px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
-                              placeholder="https://example.com"
+                              value={editingItem.title || ''}
+                              onChange={(e) => setEditingItem({ ...editingItem, title: e.target.value })}
+                              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
                               required
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Category *
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                              Content *
                             </label>
-                            <select
-                              value={editingItem.category_id || ''}
-                              onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
-                              className="w-full px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
+                            <textarea
+                              value={editingItem.content || ''}
+                              onChange={(e) => setEditingItem({ ...editingItem, content: e.target.value })}
+                              rows={15}
+                              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                              placeholder="Use Markdown formatting for rich content..."
                               required
-                            >
-                              <option value="">Select a category</option>
-                              {categories.map((category) => (
-                                <option key={category.id} value={category.id}>
-                                  {category.name}
-                                </option>
-                              ))}
-                            </select>
+                            />
+                          </div>
+                          <div>
+                            <label className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                checked={editingItem.is_active !== false}
+                                onChange={(e) => setEditingItem({ ...editingItem, is_active: e.target.checked })}
+                                className="rounded"
+                              />
+                              <span className="text-slate-300">Active</span>
+                            </label>
                           </div>
                         </>
-                      )}
-
-                      {/* Agent-specific fields */}
-                      {activeTab === 'agents' && (
+                      ) : (
                         <>
                           <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Pricing Type
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                              Name *
                             </label>
-                            <select
-                              value={editingItem.pricing_type || 'free'}
-                              onChange={(e) => setEditingItem({ ...editingItem, pricing_type: e.target.value })}
-                              className="w-full px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
-                            >
-                              <option value="free">Free</option>
-                              <option value="freemium">Freemium</option>
-                              <option value="paid">Paid</option>
-                            </select>
+                            <input
+                              type="text"
+                              value={editingItem.name || ''}
+                              onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                              required
+                            />
                           </div>
-                          
-                          <div className="grid grid-cols-2 gap-4">
-                            <label className="flex items-center space-x-2">
-                              <input
-                                type="checkbox"
-                                checked={editingItem.is_featured || false}
-                                onChange={(e) => setEditingItem({ ...editingItem, is_featured: e.target.checked })}
-                                className="rounded"
-                              />
-                              <span className="text-gray-300">Featured</span>
+                          <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                              Description *
                             </label>
-                            <label className="flex items-center space-x-2">
-                              <input
-                                type="checkbox"
-                                checked={editingItem.is_verified || false}
-                                onChange={(e) => setEditingItem({ ...editingItem, is_verified: e.target.checked })}
-                                className="rounded"
-                              />
-                              <span className="text-gray-300">Verified (Blue Tick)</span>
-                            </label>
+                            <textarea
+                              value={editingItem.description || ''}
+                              onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+                              rows={3}
+                              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                              required
+                            />
                           </div>
+
+                          {/* Image Upload Section */}
+                          {activeTab !== 'how-to-use' && (
+                            <div>
+                              <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Image
+                              </label>
+                              <div className="space-y-4">
+                                {/* Current Image Preview */}
+                                {editingItem.image_url && (
+                                  <div className="relative">
+                                    <div className="aspect-16-9 w-32 rounded-lg overflow-hidden border border-slate-600">
+                                      <img
+                                        src={editingItem.image_url}
+                                        alt="Preview"
+                                        className="image-cover"
+                                      />
+                                    </div>
+                                    <button
+                                      onClick={() => setEditingItem({ ...editingItem, image_url: '' })}
+                                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                )}
+                                
+                                {/* Upload Options */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {/* File Upload */}
+                                  <div>
+                                    <label className="cursor-pointer block">
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) handleImageUpload(file);
+                                        }}
+                                        className="hidden"
+                                        disabled={uploadingImage}
+                                      />
+                                      <div className="flex items-center justify-center space-x-2 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 hover:border-primary-500 transition-colors">
+                                        <Upload className="w-4 h-4" />
+                                        <span>{uploadingImage ? 'Uploading...' : 'Upload from PC'}</span>
+                                      </div>
+                                    </label>
+                                    <p className="text-xs text-slate-400 mt-1">Max 2MB, JPG/PNG/GIF</p>
+                                  </div>
+                                  
+                                  {/* URL Input */}
+                                  <div>
+                                    <div className="flex items-center space-x-2 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3">
+                                      <LinkIcon className="w-4 h-4 text-slate-400" />
+                                      <input
+                                        type="text"
+                                        value={editingItem.image_url?.startsWith('data:') ? '' : (editingItem.image_url || '')}
+                                        onChange={(e) => setEditingItem({ ...editingItem, image_url: e.target.value })}
+                                        placeholder="Or paste image URL"
+                                        className="flex-1 bg-transparent text-white focus:outline-none"
+                                      />
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-1">Paste direct image link</p>
+                                  </div>
+                                </div>
+                                
+                                {/* Image Alt Text */}
+                                <div>
+                                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                                    Image Alt Text
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={editingItem.image_alt || ''}
+                                    onChange={(e) => setEditingItem({ ...editingItem, image_alt: e.target.value })}
+                                    placeholder="Describe the image for accessibility"
+                                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Tool-specific fields */}
+                          {activeTab === 'tools' && (
+                            <>
+                              <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">
+                                  Tool URL *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editingItem.url || ''}
+                                  onChange={(e) => setEditingItem({ ...editingItem, url: e.target.value })}
+                                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                                  placeholder="https://example.com"
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">
+                                  Category *
+                                </label>
+                                <select
+                                  value={editingItem.category_id || ''}
+                                  onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
+                                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                                  required
+                                >
+                                  <option value="">Select a category</option>
+                                  {categories.map((category) => (
+                                    <option key={category.id} value={category.id}>
+                                      {category.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </>
+                          )}
+
+                          {/* Agent-specific fields */}
+                          {activeTab === 'agents' && (
+                            <>
+                              <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">
+                                  Pricing Type
+                                </label>
+                                <select
+                                  value={editingItem.pricing_type || 'free'}
+                                  onChange={(e) => setEditingItem({ ...editingItem, pricing_type: e.target.value })}
+                                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                                >
+                                  <option value="free">Free</option>
+                                  <option value="freemium">Freemium</option>
+                                  <option value="paid">Paid</option>
+                                </select>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-4">
+                                <label className="flex items-center space-x-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={editingItem.is_featured || false}
+                                    onChange={(e) => setEditingItem({ ...editingItem, is_featured: e.target.checked })}
+                                    className="rounded"
+                                  />
+                                  <span className="text-slate-300">Featured</span>
+                                </label>
+                                <label className="flex items-center space-x-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={editingItem.is_verified || false}
+                                    onChange={(e) => setEditingItem({ ...editingItem, is_verified: e.target.checked })}
+                                    className="rounded"
+                                  />
+                                  <span className="text-slate-300">Verified (Blue Tick)</span>
+                                </label>
+                              </div>
+                            </>
+                          )}
                         </>
                       )}
                     </div>
                   </div>
 
                   {/* SEO Settings */}
-                  <div className="border-t border-royal-dark-lighter pt-6">
-                    <h3 className="text-lg font-semibold mb-4">SEO Settings</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          SEO Title
-                          <span className="text-xs text-gray-400 ml-2">(60 characters max)</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={editingItem.seo_title || ''}
-                          onChange={(e) => {
-                            const value = e.target.value.slice(0, 60);
-                            setEditingItem({ ...editingItem, seo_title: value });
-                          }}
-                          className="w-full px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
-                          placeholder="Enter SEO title"
-                        />
-                        <div className="text-xs text-gray-400 mt-1">
-                          {(editingItem.seo_title?.length || 0)}/60 characters
+                  {activeTab !== 'how-to-use' && (
+                    <div className="border-t border-slate-600 pt-6">
+                      <h3 className="text-lg font-semibold mb-4">SEO Settings</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                            SEO Title
+                            <span className="text-xs text-slate-400 ml-2">(60 characters max)</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={editingItem.seo_title || ''}
+                            onChange={(e) => {
+                              const value = e.target.value.slice(0, 60);
+                              setEditingItem({ ...editingItem, seo_title: value });
+                            }}
+                            className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                            placeholder="Enter SEO title"
+                          />
+                          <div className="text-xs text-slate-400 mt-1">
+                            {(editingItem.seo_title?.length || 0)}/60 characters
+                          </div>
                         </div>
-                      </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          SEO Description
-                          <span className="text-xs text-gray-400 ml-2">(160 characters max)</span>
-                        </label>
-                        <textarea
-                          value={editingItem.seo_description || ''}
-                          onChange={(e) => {
-                            const value = e.target.value.slice(0, 160);
-                            setEditingItem({ ...editingItem, seo_description: value });
-                          }}
-                          rows={3}
-                          className="w-full px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
-                          placeholder="Enter SEO description"
-                        />
-                        <div className="text-xs text-gray-400 mt-1">
-                          {(editingItem.seo_description?.length || 0)}/160 characters
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                            SEO Description
+                            <span className="text-xs text-slate-400 ml-2">(160 characters max)</span>
+                          </label>
+                          <textarea
+                            value={editingItem.seo_description || ''}
+                            onChange={(e) => {
+                              const value = e.target.value.slice(0, 160);
+                              setEditingItem({ ...editingItem, seo_description: value });
+                            }}
+                            rows={3}
+                            className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                            placeholder="Enter SEO description"
+                          />
+                          <div className="text-xs text-slate-400 mt-1">
+                            {(editingItem.seo_description?.length || 0)}/160 characters
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Agent Features (for agents) */}
                   {activeTab === 'agents' && (
-                    <div className="border-t border-royal-dark-lighter pt-6">
+                    <div className="border-t border-slate-600 pt-6">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold">Features</h3>
                         <button
                           onClick={addAgentFeature}
-                          className="text-royal-gold hover:text-royal-gold/80"
+                          className="text-primary-500 hover:text-primary-400"
                         >
                           <Plus className="w-5 h-5" />
                         </button>
@@ -779,11 +860,11 @@ const Admin: React.FC = () => {
                               value={feature}
                               onChange={(e) => updateAgentFeature(index, e.target.value)}
                               placeholder="Enter feature"
-                              className="flex-1 px-4 py-2 bg-royal-dark border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
+                              className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
                             />
                             <button
                               onClick={() => removeAgentFeature(index)}
-                              className="text-gray-400 hover:text-red-500"
+                              className="text-slate-400 hover:text-red-500"
                             >
                               <X className="w-5 h-5" />
                             </button>
@@ -795,30 +876,30 @@ const Admin: React.FC = () => {
 
                   {/* Features (for tools) */}
                   {activeTab === 'tools' && (
-                    <div className="border-t border-royal-dark-lighter pt-6">
+                    <div className="border-t border-slate-600 pt-6">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold">Features</h3>
                         <button
                           onClick={addFeature}
-                          className="text-royal-gold hover:text-royal-gold/80"
+                          className="text-primary-500 hover:text-primary-400"
                         >
                           <Plus className="w-5 h-5" />
                         </button>
                       </div>
                       <div className="space-y-4">
                         {editingItem.features?.map((feature, index) => (
-                          <div key={index} className="bg-royal-dark p-4 rounded-lg">
+                          <div key={index} className="bg-slate-700 p-4 rounded-lg">
                             <div className="flex justify-between items-start mb-2">
                               <input
                                 type="text"
                                 value={feature.title}
                                 onChange={(e) => updateFeature(index, 'title', e.target.value)}
                                 placeholder="Feature title"
-                                className="flex-1 px-4 py-2 bg-royal-dark-lighter border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold mr-4"
+                                className="flex-1 px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:border-primary-500 mr-4"
                               />
                               <button
                                 onClick={() => removeFeature(index)}
-                                className="text-gray-400 hover:text-red-500"
+                                className="text-slate-400 hover:text-red-500"
                               >
                                 <X className="w-5 h-5" />
                               </button>
@@ -828,7 +909,7 @@ const Admin: React.FC = () => {
                               onChange={(e) => updateFeature(index, 'description', e.target.value)}
                               placeholder="Feature description"
                               rows={2}
-                              className="w-full px-4 py-2 bg-royal-dark-lighter border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
+                              className="w-full px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:border-primary-500"
                             />
                           </div>
                         ))}
@@ -838,30 +919,30 @@ const Admin: React.FC = () => {
 
                   {/* Use Cases (for tools) */}
                   {activeTab === 'tools' && (
-                    <div className="border-t border-royal-dark-lighter pt-6">
+                    <div className="border-t border-slate-600 pt-6">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold">Use Cases</h3>
                         <button
                           onClick={addUseCase}
-                          className="text-royal-gold hover:text-royal-gold/80"
+                          className="text-primary-500 hover:text-primary-400"
                         >
                           <Plus className="w-5 h-5" />
                         </button>
                       </div>
                       <div className="space-y-4">
                         {editingItem.useCases?.map((useCase, index) => (
-                          <div key={index} className="bg-royal-dark p-4 rounded-lg">
+                          <div key={index} className="bg-slate-700 p-4 rounded-lg">
                             <div className="flex justify-between items-start mb-2">
                               <input
                                 type="text"
                                 value={useCase.title}
                                 onChange={(e) => updateUseCase(index, 'title', e.target.value)}
                                 placeholder="Use case title"
-                                className="flex-1 px-4 py-2 bg-royal-dark-lighter border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold mr-4"
+                                className="flex-1 px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:border-primary-500 mr-4"
                               />
                               <button
                                 onClick={() => removeUseCase(index)}
-                                className="text-gray-400 hover:text-red-500"
+                                className="text-slate-400 hover:text-red-500"
                               >
                                 <X className="w-5 h-5" />
                               </button>
@@ -871,7 +952,7 @@ const Admin: React.FC = () => {
                               onChange={(e) => updateUseCase(index, 'description', e.target.value)}
                               placeholder="Use case description"
                               rows={2}
-                              className="w-full px-4 py-2 bg-royal-dark-lighter border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
+                              className="w-full px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:border-primary-500"
                             />
                           </div>
                         ))}
@@ -881,19 +962,19 @@ const Admin: React.FC = () => {
 
                   {/* Pricing (for tools) */}
                   {activeTab === 'tools' && (
-                    <div className="border-t border-royal-dark-lighter pt-6">
+                    <div className="border-t border-slate-600 pt-6">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold">Pricing Plans</h3>
                         <button
                           onClick={addPricingPlan}
-                          className="text-royal-gold hover:text-royal-gold/80"
+                          className="text-primary-500 hover:text-primary-400"
                         >
                           <Plus className="w-5 h-5" />
                         </button>
                       </div>
                       <div className="space-y-4">
                         {editingItem.pricing?.map((plan, index) => (
-                          <div key={index} className="bg-royal-dark p-4 rounded-lg">
+                          <div key={index} className="bg-slate-700 p-4 rounded-lg">
                             <div className="flex justify-between items-start mb-4">
                               <div className="flex-1 grid grid-cols-2 gap-4">
                                 <input
@@ -901,19 +982,19 @@ const Admin: React.FC = () => {
                                   value={plan.plan}
                                   onChange={(e) => updatePricingPlan(index, 'plan', e.target.value)}
                                   placeholder="Plan name"
-                                  className="px-4 py-2 bg-royal-dark-lighter border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
+                                  className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:border-primary-500"
                                 />
                                 <input
                                   type="text"
                                   value={plan.price}
                                   onChange={(e) => updatePricingPlan(index, 'price', e.target.value)}
                                   placeholder="Price"
-                                  className="px-4 py-2 bg-royal-dark-lighter border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
+                                  className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:border-primary-500"
                                 />
                               </div>
                               <button
                                 onClick={() => removePricingPlan(index)}
-                                className="ml-4 text-gray-400 hover:text-red-500"
+                                className="ml-4 text-slate-400 hover:text-red-500"
                               >
                                 <X className="w-5 h-5" />
                               </button>
@@ -923,7 +1004,7 @@ const Admin: React.FC = () => {
                               onChange={(e) => updatePricingPlan(index, 'features', e.target.value.split('\n').filter(f => f.trim()))}
                               placeholder="Features (one per line)"
                               rows={3}
-                              className="w-full px-4 py-2 bg-royal-dark-lighter border border-royal-dark-lighter rounded-lg text-white focus:outline-none focus:border-royal-gold"
+                              className="w-full px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:border-primary-500"
                             />
                           </div>
                         ))}
