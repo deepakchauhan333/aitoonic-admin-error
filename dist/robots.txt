@@ -4,6 +4,7 @@ Allow: /
 
 # Sitemap location
 Sitemap: https://aitoonic.com/sitemap.xml
+Sitemap: https://aitoonic.com/api/sitemap/index.xml
 
 # Disallow admin area
 Disallow: /admin
