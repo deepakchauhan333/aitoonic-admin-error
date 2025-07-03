@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Star, Bot, ExternalLink, ChevronRight, DollarSign, Check } from 'lucide-react';
+import { Star, Bot, ExternalLink, ChevronRight, DollarSign, Check, BookOpen } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { SEO } from '../components/SEO';
 import { generateToolSchema } from '../utils/schema';
@@ -16,6 +16,7 @@ interface Tool {
   rating: number;
   seo_title?: string;
   seo_description?: string;
+  how_to_use?: string;
   features?: {
     title: string;
     description: string;
@@ -172,7 +173,7 @@ function ToolDetail() {
                             {[...Array(5)].map((_, i) => (
                               <Star 
                                 key={i}
-                                className="w-5 h-5 text-secondary-500" 
+                                className="w-5 h-5 text-yellow-500" 
                                 fill={i < Math.floor(tool.rating) ? "currentColor" : "none"}
                               />
                             ))}
@@ -194,8 +195,8 @@ function ToolDetail() {
                 </div>
                 {tool.pricing && tool.pricing.length > 0 && (
                   <div className="flex items-center space-x-2 bg-slate-700 rounded-full px-4 py-2">
-                    <DollarSign className="w-5 h-5 text-secondary-500" />
-                    <span className="text-secondary-500 font-medium">
+                    <DollarSign className="w-5 h-5 text-green-500" />
+                    <span className="text-green-500 font-medium">
                       {tool.pricing[0].price}
                     </span>
                   </div>
@@ -227,9 +228,22 @@ function ToolDetail() {
             </div>
           </div>
 
-          {/* Features, Use Cases, and Pricing */}
+          {/* Features, Use Cases, How to Use, and Pricing */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
             <div className="lg:col-span-2 space-y-8">
+              {/* How to Use */}
+              {tool.how_to_use && (
+                <div className="card p-4 sm:p-8">
+                  <h2 className="text-2xl font-bold mb-6 flex items-center">
+                    <BookOpen className="w-6 h-6 mr-2 text-primary-500" />
+                    How to Use {tool.name}
+                  </h2>
+                  <div className="prose prose-invert max-w-none">
+                    <p className="text-slate-300 whitespace-pre-wrap">{tool.how_to_use}</p>
+                  </div>
+                </div>
+              )}
+
               {/* Features */}
               {tool.features && tool.features.length > 0 && (
                 <div className="card p-4 sm:p-8">
@@ -280,12 +294,12 @@ function ToolDetail() {
                       >
                         <div className="flex items-center justify-between mb-4">
                           <h3 className="text-lg font-bold text-white">{plan.plan}</h3>
-                          <span className="text-secondary-500 font-semibold text-xl">{plan.price}</span>
+                          <span className="text-green-500 font-semibold text-xl">{plan.price}</span>
                         </div>
                         <ul className="space-y-3">
                           {plan.features.map((feature, i) => (
                             <li key={i} className="flex items-center text-slate-300">
-                              <Check className="w-4 h-4 text-success-500 mr-3 flex-shrink-0" />
+                              <Check className="w-4 h-4 text-green-500 mr-3 flex-shrink-0" />
                               <span className="text-sm">{feature}</span>
                             </li>
                           ))}
@@ -314,29 +328,24 @@ function ToolDetail() {
               {similarTools.length > 0 && (
                 <div className="card p-4 sm:p-8 mt-8">
                   <h2 className="text-2xl font-bold mb-6">Similar Tools</h2>
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
                     {similarTools.map((similarTool) => (
                       <Link
                         key={similarTool.id}
                         to={`/ai/${similarTool.name.toLowerCase().replace(/\s+/g, '-')}`}
                         className="group block"
                       >
-                        <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-700/50 transition-colors">
-                          <div className="aspect-square w-12 h-12 rounded-lg overflow-hidden">
+                        <div className="card p-3 hover:border-primary-500 transition-colors">
+                          <div className="aspect-16-9 rounded-lg overflow-hidden mb-3">
                             <img
                               src={similarTool.image_url || 'https://i.imgur.com/ZXqf6Kx.png'}
                               alt={similarTool.name}
                               className="image-cover"
                             />
                           </div>
-                          <div>
-                            <h3 className="font-semibold text-white group-hover:text-primary-500 transition-colors">
-                              {similarTool.name}
-                            </h3>
-                            <p className="text-sm text-slate-400 line-clamp-1">
-                              {similarTool.description}
-                            </p>
-                          </div>
+                          <h3 className="font-semibold text-white group-hover:text-primary-500 transition-colors text-sm">
+                            {similarTool.name}
+                          </h3>
                         </div>
                       </Link>
                     ))}

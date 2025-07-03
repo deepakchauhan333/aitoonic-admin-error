@@ -3,15 +3,9 @@
 @tailwind utilities;
 
 :root {
-  /* Main Colors */
-  --primary: #0ea5e9;
-  --primary-dark: #0284c7;
-  --secondary: #eab308;
-  --secondary-dark: #ca8a04;
-  
-  /* Sub Colors */
-  --accent: #64748b;
-  --success: #22c55e;
+  /* Simple blue color scheme */
+  --primary: #3b82f6;
+  --primary-dark: #2563eb;
   
   /* Background Colors */
   --bg-primary: #0f172a;
@@ -59,7 +53,7 @@ body {
 }
 
 .gradient-text {
-  background: linear-gradient(45deg, var(--primary), var(--secondary));
+  background: linear-gradient(45deg, var(--primary), #60a5fa);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -71,7 +65,7 @@ body {
 
 .card-hover:hover {
   transform: translateY(-5px);
-  box-shadow: 0 20px 40px rgba(14, 165, 233, 0.15);
+  box-shadow: 0 20px 40px rgba(59, 130, 246, 0.15);
 }
 
 /* Button Styles */
@@ -88,23 +82,7 @@ body {
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(14, 165, 233, 0.3);
-}
-
-.btn-secondary {
-  background: linear-gradient(135deg, var(--secondary), var(--secondary-dark));
-  color: var(--bg-primary);
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.btn-secondary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(234, 179, 8, 0.3);
+  box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
 }
 
 /* Card Styles */
@@ -118,7 +96,7 @@ body {
 
 .card:hover {
   border-color: var(--primary);
-  box-shadow: 0 20px 40px rgba(14, 165, 233, 0.1);
+  box-shadow: 0 20px 40px rgba(59, 130, 246, 0.1);
 }
 
 /* Aspect Ratio Utilities */
@@ -130,12 +108,13 @@ body {
   aspect-ratio: 1 / 1;
 }
 
-/* Image Styles */
+/* Image Styles - Fixed to prevent cropping */
 .image-cover {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain; /* Changed from cover to contain to prevent cropping */
   object-position: center;
+  background: #1e293b; /* Add background color for letterboxing */
 }
 
 /* TipTap Editor Styles */

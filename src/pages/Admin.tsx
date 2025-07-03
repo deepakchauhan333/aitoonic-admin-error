@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Sparkles, Bot, Search, Save, Plus, X, LogOut, Upload, Check, Link as LinkIcon, FileText } from 'lucide-react';
+import { Sparkles, Bot, Search, Save, Plus, X, LogOut, Upload, Check, Link as LinkIcon } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 interface Feature {
@@ -29,7 +29,7 @@ interface EditingItem {
   features?: Feature[];
   useCases?: UseCase[];
   pricing?: PricingPlan[];
-  type?: 'tool' | 'category' | 'agent' | 'how-to-use';
+  type?: 'tool' | 'category' | 'agent';
   image_url?: string;
   image_alt?: string;
   url?: string;
@@ -45,15 +45,13 @@ interface EditingItem {
   is_featured?: boolean;
   is_verified?: boolean;
   agent_features?: string[];
-  title?: string;
-  content?: string;
-  is_active?: boolean;
+  how_to_use?: string;
   [key: string]: any;
 }
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'tools' | 'categories' | 'agents' | 'how-to-use'>('tools');
+  const [activeTab, setActiveTab] = useState<'tools' | 'categories' | 'agents'>('tools');
   const [items, setItems] = useState<EditingItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<EditingItem[]>([]);
   const [editingItem, setEditingItem] = useState<EditingItem | null>(null);
@@ -111,7 +109,6 @@ const Admin: React.FC = () => {
     } else {
       const filtered = items.filter(item =>
         item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.description?.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredItems(filtered);
@@ -152,9 +149,8 @@ const Admin: React.FC = () => {
   const fetchItems = async () => {
     setLoading(true);
     try {
-      const tableName = activeTab === 'how-to-use' ? 'how_to_use' : activeTab;
       const { data: items, error } = await supabase
-        .from(tableName)
+        .from(activeTab)
         .select('*')
         .order('created_at', { ascending: false });
       
@@ -175,12 +171,6 @@ const Admin: React.FC = () => {
   };
 
   const validateForm = (item: EditingItem): string | null => {
-    if (activeTab === 'how-to-use') {
-      if (!item.title?.trim()) return 'Title is required';
-      if (!item.content?.trim()) return 'Content is required';
-      return null;
-    }
-
     if (!item.name?.trim()) return 'Name is required';
     if (!item.description?.trim()) return 'Description is required';
     
@@ -244,60 +234,49 @@ const Admin: React.FC = () => {
 
     setSaving(true);
     try {
-      const tableName = activeTab === 'how-to-use' ? 'how_to_use' : activeTab;
-      
       // Prepare base data
-      let dataToSave: any = {};
+      let dataToSave: any = {
+        name: editingItem.name?.trim(),
+        description: editingItem.description?.trim(),
+        seo_title: editingItem.seo_title?.trim() || null,
+        seo_description: editingItem.seo_description?.trim() || null,
+        image_url: editingItem.image_url?.trim() || null,
+        image_alt: editingItem.image_alt?.trim() || null,
+      };
 
-      if (activeTab === 'how-to-use') {
+      // Add specific fields based on type
+      if (activeTab === 'tools') {
         dataToSave = {
-          title: editingItem.title?.trim(),
-          content: editingItem.content?.trim(),
-          is_active: editingItem.is_active !== false,
+          ...dataToSave,
+          url: editingItem.url?.trim(),
+          category_id: editingItem.category_id,
+          features: editingItem.features || [],
+          useCases: editingItem.useCases || [],
+          pricing: editingItem.pricing || [],
+          how_to_use: editingItem.how_to_use?.trim() || null
         };
-      } else {
+      } else if (activeTab === 'agents') {
         dataToSave = {
-          name: editingItem.name?.trim(),
-          description: editingItem.description?.trim(),
-          seo_title: editingItem.seo_title?.trim() || null,
-          seo_description: editingItem.seo_description?.trim() || null,
-          image_url: editingItem.image_url?.trim() || null,
-          image_alt: editingItem.image_alt?.trim() || null,
+          ...dataToSave,
+          agent_features: editingItem.agent_features?.filter(feature => feature.trim()) || [],
+          is_featured: editingItem.is_featured || false,
+          is_verified: editingItem.is_verified || false,
+          pricing_type: editingItem.pricing_type || 'free'
         };
-
-        // Add specific fields based on type
-        if (activeTab === 'tools') {
-          dataToSave = {
-            ...dataToSave,
-            url: editingItem.url?.trim(),
-            category_id: editingItem.category_id,
-            features: editingItem.features || [],
-            useCases: editingItem.useCases || [],
-            pricing: editingItem.pricing || []
-          };
-        } else if (activeTab === 'agents') {
-          dataToSave = {
-            ...dataToSave,
-            agent_features: editingItem.agent_features?.filter(feature => feature.trim()) || [],
-            is_featured: editingItem.is_featured || false,
-            is_verified: editingItem.is_verified || false,
-            pricing_type: editingItem.pricing_type || 'free'
-          };
-        }
       }
 
       let result;
       if (editingItem.id) {
         // Update existing item
         result = await supabase
-          .from(tableName)
+          .from(activeTab)
           .update(dataToSave)
           .eq('id', editingItem.id)
           .select();
       } else {
         // Insert new item
         result = await supabase
-          .from(tableName)
+          .from(activeTab)
           .insert([dataToSave])
           .select();
       }
@@ -308,7 +287,7 @@ const Admin: React.FC = () => {
         return;
       }
 
-      toast.success(`${activeTab.replace('-', ' ')} saved successfully!`);
+      toast.success(`${activeTab.slice(0, -1)} saved successfully!`);
       fetchItems();
       setEditingItem(null);
     } catch (error) {
@@ -459,15 +438,6 @@ const Admin: React.FC = () => {
                 <Bot className="w-5 h-5" />
                 <span>Agents</span>
               </button>
-              <button
-                onClick={() => setActiveTab('how-to-use')}
-                className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-all ${
-                  activeTab === 'how-to-use' ? 'bg-primary-500 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
-                }`}
-              >
-                <FileText className="w-5 h-5" />
-                <span>How to Use</span>
-              </button>
             </div>
             <div className="flex items-center space-x-2 text-slate-400">
               <span className="text-sm">Welcome, {user?.email}</span>
@@ -488,7 +458,7 @@ const Admin: React.FC = () => {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold">Items</h2>
               <button
-                onClick={() => setEditingItem({ type: activeTab.replace('-', '_') as any })}
+                onClick={() => setEditingItem({ type: activeTab.slice(0, -1) as any })}
                 className="p-2 text-primary-500 hover:bg-slate-700 rounded-lg transition-colors"
               >
                 <Plus className="w-5 h-5" />
@@ -522,7 +492,7 @@ const Admin: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-center space-x-2">
-                      <h3 className="font-medium text-white">{item.name || item.title}</h3>
+                      <h3 className="font-medium text-white">{item.name}</h3>
                       {activeTab === 'agents' && item.is_verified && (
                         <Check className="w-4 h-4 text-blue-500" />
                       )}
@@ -562,283 +532,248 @@ const Admin: React.FC = () => {
                   <div>
                     <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
                     <div className="space-y-4">
-                      {activeTab === 'how-to-use' ? (
-                        <>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={editingItem.name || ''}
+                          onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                          className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Description *
+                        </label>
+                        <textarea
+                          value={editingItem.description || ''}
+                          onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+                          rows={3}
+                          className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                          required
+                        />
+                      </div>
+
+                      {/* Image Upload Section */}
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Image
+                        </label>
+                        <div className="space-y-4">
+                          {/* Current Image Preview */}
+                          {editingItem.image_url && (
+                            <div className="relative">
+                              <div className="aspect-16-9 w-32 rounded-lg overflow-hidden border border-slate-600">
+                                <img
+                                  src={editingItem.image_url}
+                                  alt="Preview"
+                                  className="image-cover"
+                                />
+                              </div>
+                              <button
+                                onClick={() => setEditingItem({ ...editingItem, image_url: '' })}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+                          
+                          {/* Upload Options */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* File Upload */}
+                            <div>
+                              <label className="cursor-pointer block">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleImageUpload(file);
+                                  }}
+                                  className="hidden"
+                                  disabled={uploadingImage}
+                                />
+                                <div className="flex items-center justify-center space-x-2 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 hover:border-primary-500 transition-colors">
+                                  <Upload className="w-4 h-4" />
+                                  <span>{uploadingImage ? 'Uploading...' : 'Upload from PC'}</span>
+                                </div>
+                              </label>
+                              <p className="text-xs text-slate-400 mt-1">Max 2MB, JPG/PNG/GIF</p>
+                            </div>
+                            
+                            {/* URL Input */}
+                            <div>
+                              <div className="flex items-center space-x-2 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3">
+                                <LinkIcon className="w-4 h-4 text-slate-400" />
+                                <input
+                                  type="text"
+                                  value={editingItem.image_url?.startsWith('data:') ? '' : (editingItem.image_url || '')}
+                                  onChange={(e) => setEditingItem({ ...editingItem, image_url: e.target.value })}
+                                  placeholder="Or paste image URL"
+                                  className="flex-1 bg-transparent text-white focus:outline-none"
+                                />
+                              </div>
+                              <p className="text-xs text-slate-400 mt-1">Paste direct image link</p>
+                            </div>
+                          </div>
+                          
+                          {/* Image Alt Text */}
                           <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">
-                              Title *
+                              Image Alt Text
                             </label>
                             <input
                               type="text"
-                              value={editingItem.title || ''}
-                              onChange={(e) => setEditingItem({ ...editingItem, title: e.target.value })}
+                              value={editingItem.image_alt || ''}
+                              onChange={(e) => setEditingItem({ ...editingItem, image_alt: e.target.value })}
+                              placeholder="Describe the image for accessibility"
                               className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tool-specific fields */}
+                      {activeTab === 'tools' && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                              Tool URL *
+                            </label>
+                            <input
+                              type="text"
+                              value={editingItem.url || ''}
+                              onChange={(e) => setEditingItem({ ...editingItem, url: e.target.value })}
+                              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                              placeholder="https://example.com"
                               required
                             />
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">
-                              Content *
+                              Category *
                             </label>
-                            <textarea
-                              value={editingItem.content || ''}
-                              onChange={(e) => setEditingItem({ ...editingItem, content: e.target.value })}
-                              rows={15}
+                            <select
+                              value={editingItem.category_id || ''}
+                              onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
                               className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                              placeholder="Use Markdown formatting for rich content..."
                               required
-                            />
+                            >
+                              <option value="">Select a category</option>
+                              {categories.map((category) => (
+                                <option key={category.id} value={category.id}>
+                                  {category.name}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                           <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                              How to Use
+                            </label>
+                            <textarea
+                              value={editingItem.how_to_use || ''}
+                              onChange={(e) => setEditingItem({ ...editingItem, how_to_use: e.target.value })}
+                              rows={5}
+                              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                              placeholder="Explain how to use this tool..."
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {/* Agent-specific fields */}
+                      {activeTab === 'agents' && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                              Pricing Type
+                            </label>
+                            <select
+                              value={editingItem.pricing_type || 'free'}
+                              onChange={(e) => setEditingItem({ ...editingItem, pricing_type: e.target.value })}
+                              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                            >
+                              <option value="free">Free</option>
+                              <option value="freemium">Freemium</option>
+                              <option value="paid">Paid</option>
+                            </select>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
                             <label className="flex items-center space-x-2">
                               <input
                                 type="checkbox"
-                                checked={editingItem.is_active !== false}
-                                onChange={(e) => setEditingItem({ ...editingItem, is_active: e.target.checked })}
+                                checked={editingItem.is_featured || false}
+                                onChange={(e) => setEditingItem({ ...editingItem, is_featured: e.target.checked })}
                                 className="rounded"
                               />
-                              <span className="text-slate-300">Active</span>
+                              <span className="text-slate-300">Featured</span>
+                            </label>
+                            <label className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                checked={editingItem.is_verified || false}
+                                onChange={(e) => setEditingItem({ ...editingItem, is_verified: e.target.checked })}
+                                className="rounded"
+                              />
+                              <span className="text-slate-300">Verified (Blue Tick)</span>
                             </label>
                           </div>
-                        </>
-                      ) : (
-                        <>
-                          <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-2">
-                              Name *
-                            </label>
-                            <input
-                              type="text"
-                              value={editingItem.name || ''}
-                              onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-2">
-                              Description *
-                            </label>
-                            <textarea
-                              value={editingItem.description || ''}
-                              onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-                              rows={3}
-                              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                              required
-                            />
-                          </div>
-
-                          {/* Image Upload Section */}
-                          {activeTab !== 'how-to-use' && (
-                            <div>
-                              <label className="block text-sm font-medium text-slate-300 mb-2">
-                                Image
-                              </label>
-                              <div className="space-y-4">
-                                {/* Current Image Preview */}
-                                {editingItem.image_url && (
-                                  <div className="relative">
-                                    <div className="aspect-16-9 w-32 rounded-lg overflow-hidden border border-slate-600">
-                                      <img
-                                        src={editingItem.image_url}
-                                        alt="Preview"
-                                        className="image-cover"
-                                      />
-                                    </div>
-                                    <button
-                                      onClick={() => setEditingItem({ ...editingItem, image_url: '' })}
-                                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                )}
-                                
-                                {/* Upload Options */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  {/* File Upload */}
-                                  <div>
-                                    <label className="cursor-pointer block">
-                                      <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={(e) => {
-                                          const file = e.target.files?.[0];
-                                          if (file) handleImageUpload(file);
-                                        }}
-                                        className="hidden"
-                                        disabled={uploadingImage}
-                                      />
-                                      <div className="flex items-center justify-center space-x-2 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 hover:border-primary-500 transition-colors">
-                                        <Upload className="w-4 h-4" />
-                                        <span>{uploadingImage ? 'Uploading...' : 'Upload from PC'}</span>
-                                      </div>
-                                    </label>
-                                    <p className="text-xs text-slate-400 mt-1">Max 2MB, JPG/PNG/GIF</p>
-                                  </div>
-                                  
-                                  {/* URL Input */}
-                                  <div>
-                                    <div className="flex items-center space-x-2 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3">
-                                      <LinkIcon className="w-4 h-4 text-slate-400" />
-                                      <input
-                                        type="text"
-                                        value={editingItem.image_url?.startsWith('data:') ? '' : (editingItem.image_url || '')}
-                                        onChange={(e) => setEditingItem({ ...editingItem, image_url: e.target.value })}
-                                        placeholder="Or paste image URL"
-                                        className="flex-1 bg-transparent text-white focus:outline-none"
-                                      />
-                                    </div>
-                                    <p className="text-xs text-slate-400 mt-1">Paste direct image link</p>
-                                  </div>
-                                </div>
-                                
-                                {/* Image Alt Text */}
-                                <div>
-                                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                                    Image Alt Text
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={editingItem.image_alt || ''}
-                                    onChange={(e) => setEditingItem({ ...editingItem, image_alt: e.target.value })}
-                                    placeholder="Describe the image for accessibility"
-                                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Tool-specific fields */}
-                          {activeTab === 'tools' && (
-                            <>
-                              <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-2">
-                                  Tool URL *
-                                </label>
-                                <input
-                                  type="text"
-                                  value={editingItem.url || ''}
-                                  onChange={(e) => setEditingItem({ ...editingItem, url: e.target.value })}
-                                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                                  placeholder="https://example.com"
-                                  required
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-2">
-                                  Category *
-                                </label>
-                                <select
-                                  value={editingItem.category_id || ''}
-                                  onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
-                                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                                  required
-                                >
-                                  <option value="">Select a category</option>
-                                  {categories.map((category) => (
-                                    <option key={category.id} value={category.id}>
-                                      {category.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            </>
-                          )}
-
-                          {/* Agent-specific fields */}
-                          {activeTab === 'agents' && (
-                            <>
-                              <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-2">
-                                  Pricing Type
-                                </label>
-                                <select
-                                  value={editingItem.pricing_type || 'free'}
-                                  onChange={(e) => setEditingItem({ ...editingItem, pricing_type: e.target.value })}
-                                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                                >
-                                  <option value="free">Free</option>
-                                  <option value="freemium">Freemium</option>
-                                  <option value="paid">Paid</option>
-                                </select>
-                              </div>
-                              
-                              <div className="grid grid-cols-2 gap-4">
-                                <label className="flex items-center space-x-2">
-                                  <input
-                                    type="checkbox"
-                                    checked={editingItem.is_featured || false}
-                                    onChange={(e) => setEditingItem({ ...editingItem, is_featured: e.target.checked })}
-                                    className="rounded"
-                                  />
-                                  <span className="text-slate-300">Featured</span>
-                                </label>
-                                <label className="flex items-center space-x-2">
-                                  <input
-                                    type="checkbox"
-                                    checked={editingItem.is_verified || false}
-                                    onChange={(e) => setEditingItem({ ...editingItem, is_verified: e.target.checked })}
-                                    className="rounded"
-                                  />
-                                  <span className="text-slate-300">Verified (Blue Tick)</span>
-                                </label>
-                              </div>
-                            </>
-                          )}
                         </>
                       )}
                     </div>
                   </div>
 
                   {/* SEO Settings */}
-                  {activeTab !== 'how-to-use' && (
-                    <div className="border-t border-slate-600 pt-6">
-                      <h3 className="text-lg font-semibold mb-4">SEO Settings</h3>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">
-                            SEO Title
-                            <span className="text-xs text-slate-400 ml-2">(60 characters max)</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={editingItem.seo_title || ''}
-                            onChange={(e) => {
-                              const value = e.target.value.slice(0, 60);
-                              setEditingItem({ ...editingItem, seo_title: value });
-                            }}
-                            className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                            placeholder="Enter SEO title"
-                          />
-                          <div className="text-xs text-slate-400 mt-1">
-                            {(editingItem.seo_title?.length || 0)}/60 characters
-                          </div>
+                  <div className="border-t border-slate-600 pt-6">
+                    <h3 className="text-lg font-semibold mb-4">SEO Settings</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          SEO Title
+                          <span className="text-xs text-slate-400 ml-2">(60 characters max)</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={editingItem.seo_title || ''}
+                          onChange={(e) => {
+                            const value = e.target.value.slice(0, 60);
+                            setEditingItem({ ...editingItem, seo_title: value });
+                          }}
+                          className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                          placeholder="Enter SEO title"
+                        />
+                        <div className="text-xs text-slate-400 mt-1">
+                          {(editingItem.seo_title?.length || 0)}/60 characters
                         </div>
+                      </div>
 
-                        <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">
-                            SEO Description
-                            <span className="text-xs text-slate-400 ml-2">(160 characters max)</span>
-                          </label>
-                          <textarea
-                            value={editingItem.seo_description || ''}
-                            onChange={(e) => {
-                              const value = e.target.value.slice(0, 160);
-                              setEditingItem({ ...editingItem, seo_description: value });
-                            }}
-                            rows={3}
-                            className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                            placeholder="Enter SEO description"
-                          />
-                          <div className="text-xs text-slate-400 mt-1">
-                            {(editingItem.seo_description?.length || 0)}/160 characters
-                          </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          SEO Description
+                          <span className="text-xs text-slate-400 ml-2">(160 characters max)</span>
+                        </label>
+                        <textarea
+                          value={editingItem.seo_description || ''}
+                          onChange={(e) => {
+                            const value = e.target.value.slice(0, 160);
+                            setEditingItem({ ...editingItem, seo_description: value });
+                          }}
+                          rows={3}
+                          className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                          placeholder="Enter SEO description"
+                        />
+                        <div className="text-xs text-slate-400 mt-1">
+                          {(editingItem.seo_description?.length || 0)}/160 characters
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
 
                   {/* Agent Features (for agents) */}
                   {activeTab === 'agents' && (

@@ -4,55 +4,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Main Colors - Professional and trustworthy
+        // Simple blue color scheme
         primary: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#0ea5e9', // Main primary
-          600: '#0284c7',
-          700: '#0369a1',
-          800: '#075985',
-          900: '#0c4a6e',
-        },
-        secondary: {
-          50: '#fefce8',
-          100: '#fef9c3',
-          200: '#fef08a',
-          300: '#fde047',
-          400: '#facc15',
-          500: '#eab308', // Main secondary
-          600: '#ca8a04',
-          700: '#a16207',
-          800: '#854d0e',
-          900: '#713f12',
-        },
-        // Sub Colors - Supporting colors
-        accent: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b', // Sub color 1
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-        },
-        success: {
-          50: '#f0fdf4',
-          100: '#dcfce7',
-          200: '#bbf7d0',
-          300: '#86efac',
-          400: '#4ade80',
-          500: '#22c55e', // Sub color 2
-          600: '#16a34a',
-          700: '#15803d',
-          800: '#166534',
-          900: '#14532d',
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6', // Main blue
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
         },
         // Legacy colors for backward compatibility
         royal: {
@@ -103,9 +66,9 @@ export default {
           css: {
             color: '#fff',
             a: {
-              color: '#0ea5e9',
+              color: '#3b82f6',
               '&:hover': {
-                color: '#0284c7',
+                color: '#2563eb',
               },
             },
             h1: {
@@ -128,7 +91,7 @@ export default {
             },
             blockquote: {
               color: '#999',
-              borderLeftColor: '#0ea5e9',
+              borderLeftColor: '#3b82f6',
             },
           },
         },
