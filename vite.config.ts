@@ -46,5 +46,8 @@ export default defineConfig({
     headers: {
       'Cache-Control': 'public, max-age=31536000'
     }
+  },
+  ssr: {
+    noExternal: ['@supabase/supabase-js', 'lucide-react']
   }
 });

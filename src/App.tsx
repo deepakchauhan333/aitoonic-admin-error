@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { Sparkles, Menu, X } from 'lucide-react';
@@ -22,9 +22,22 @@ import DynamicSitemap from './pages/DynamicSitemap';
 import NotFound from './pages/NotFound';
 import { AuthProvider } from './context/AuthContext';
 import { ScrollToTop } from './components/ScrollToTop';
+import { useSSR } from './hooks/useSSR';
+import { preloadCriticalResources, addResourceHints } from './utils/preloader';
+import { trackWebVitals } from './utils/performance';
 
 const App: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const isSSR = useSSR();
+
+  useEffect(() => {
+    if (!isSSR) {
+      // Client-side only optimizations
+      preloadCriticalResources();
+      addResourceHints();
+      trackWebVitals();
+    }
+  }, [isSSR]);
 
   return (
     <HelmetProvider>
