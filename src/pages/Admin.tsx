@@ -174,6 +174,12 @@ const Admin: React.FC = () => {
     if (!item.name?.trim()) return 'Name is required';
     if (!item.description?.trim()) return 'Description is required';
     
+    // Category validation
+    if (activeTab === 'categories') {
+      if (item.name.length > 60) return 'Category title must be 60 characters or less';
+      if (item.description.length > 160) return 'Category description must be 160 characters or less';
+    }
+    
     if (activeTab === 'tools') {
       if (!item.url?.trim()) return 'Tool URL is required';
       if (!item.category_id) return 'Category is required';
@@ -240,8 +246,6 @@ const Admin: React.FC = () => {
         description: editingItem.description?.trim(),
         seo_title: editingItem.seo_title?.trim() || null,
         seo_description: editingItem.seo_description?.trim() || null,
-        image_url: editingItem.image_url?.trim() || null,
-        image_alt: editingItem.image_alt?.trim() || null,
       };
 
       // Add specific fields based on type
@@ -253,7 +257,9 @@ const Admin: React.FC = () => {
           features: editingItem.features || [],
           useCases: editingItem.useCases || [],
           pricing: editingItem.pricing || [],
-          how_to_use: editingItem.how_to_use?.trim() || null
+          how_to_use: editingItem.how_to_use?.trim() || null,
+          image_url: editingItem.image_url?.trim() || null,
+          image_alt: editingItem.image_alt?.trim() || null,
         };
       } else if (activeTab === 'agents') {
         dataToSave = {
@@ -261,9 +267,12 @@ const Admin: React.FC = () => {
           agent_features: editingItem.agent_features?.filter(feature => feature.trim()) || [],
           is_featured: editingItem.is_featured || false,
           is_verified: editingItem.is_verified || false,
-          pricing_type: editingItem.pricing_type || 'free'
+          pricing_type: editingItem.pricing_type || 'free',
+          image_url: editingItem.image_url?.trim() || null,
+          image_alt: editingItem.image_alt?.trim() || null,
         };
       }
+      // For categories, we only save the basic fields (no image fields)
 
       let result;
       if (editingItem.id) {
@@ -534,108 +543,130 @@ const Admin: React.FC = () => {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Name *
+                          {activeTab === 'categories' ? 'Category Title' : 'Name'} *
+                          {activeTab === 'categories' && (
+                            <span className="text-xs text-slate-400 ml-2">(max 60 characters)</span>
+                          )}
                         </label>
                         <input
                           type="text"
                           value={editingItem.name || ''}
                           onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
                           className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                          placeholder={activeTab === 'categories' ? 'Enter a clear, descriptive title' : 'Enter name'}
+                          maxLength={activeTab === 'categories' ? 60 : undefined}
                           required
                         />
+                        {activeTab === 'categories' && (
+                          <div className="text-xs text-slate-400 mt-1">
+                            {(editingItem.name?.length || 0)}/60 characters
+                          </div>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Description *
+                          {activeTab === 'categories' ? 'Category Description' : 'Description'} *
+                          {activeTab === 'categories' && (
+                            <span className="text-xs text-slate-400 ml-2">(max 160 characters)</span>
+                          )}
                         </label>
                         <textarea
                           value={editingItem.description || ''}
                           onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
                           rows={3}
                           className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                          placeholder={activeTab === 'categories' ? 'Enter a detailed description' : 'Enter description'}
+                          maxLength={activeTab === 'categories' ? 160 : undefined}
                           required
                         />
+                        {activeTab === 'categories' && (
+                          <div className="text-xs text-slate-400 mt-1">
+                            {(editingItem.description?.length || 0)}/160 characters
+                          </div>
+                        )}
                       </div>
 
-                      {/* Image Upload Section */}
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Image
-                        </label>
-                        <div className="space-y-4">
-                          {/* Current Image Preview */}
-                          {editingItem.image_url && (
-                            <div className="relative">
-                              <div className="aspect-16-9 w-32 rounded-lg overflow-hidden border border-slate-600">
-                                <img
-                                  src={editingItem.image_url}
-                                  alt="Preview"
-                                  className="image-cover"
-                                />
-                              </div>
-                              <button
-                                onClick={() => setEditingItem({ ...editingItem, image_url: '' })}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          )}
-                          
-                          {/* Upload Options */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* File Upload */}
-                            <div>
-                              <label className="cursor-pointer block">
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) handleImageUpload(file);
-                                  }}
-                                  className="hidden"
-                                  disabled={uploadingImage}
-                                />
-                                <div className="flex items-center justify-center space-x-2 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 hover:border-primary-500 transition-colors">
-                                  <Upload className="w-4 h-4" />
-                                  <span>{uploadingImage ? 'Uploading...' : 'Upload from PC'}</span>
+                      {/* Image Upload Section - Only for Tools and Agents */}
+                      {activeTab !== 'categories' && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Image
+                          </label>
+                          <div className="space-y-4">
+                            {/* Current Image Preview */}
+                            {editingItem.image_url && (
+                              <div className="relative">
+                                <div className="aspect-16-9 w-32 rounded-lg overflow-hidden border border-slate-600">
+                                  <img
+                                    src={editingItem.image_url}
+                                    alt="Preview"
+                                    className="image-cover"
+                                  />
                                 </div>
-                              </label>
-                              <p className="text-xs text-slate-400 mt-1">Max 2MB, JPG/PNG/GIF</p>
+                                <button
+                                  onClick={() => setEditingItem({ ...editingItem, image_url: '' })}
+                                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
+                            
+                            {/* Upload Options */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* File Upload */}
+                              <div>
+                                <label className="cursor-pointer block">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleImageUpload(file);
+                                    }}
+                                    className="hidden"
+                                    disabled={uploadingImage}
+                                  />
+                                  <div className="flex items-center justify-center space-x-2 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 hover:border-primary-500 transition-colors">
+                                    <Upload className="w-4 h-4" />
+                                    <span>{uploadingImage ? 'Uploading...' : 'Upload from PC'}</span>
+                                  </div>
+                                </label>
+                                <p className="text-xs text-slate-400 mt-1">Max 2MB, JPG/PNG/GIF</p>
+                              </div>
+                              
+                              {/* URL Input */}
+                              <div>
+                                <div className="flex items-center space-x-2 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3">
+                                  <LinkIcon className="w-4 h-4 text-slate-400" />
+                                  <input
+                                    type="text"
+                                    value={editingItem.image_url?.startsWith('data:') ? '' : (editingItem.image_url || '')}
+                                    onChange={(e) => setEditingItem({ ...editingItem, image_url: e.target.value })}
+                                    placeholder="Or paste image URL"
+                                    className="flex-1 bg-transparent text-white focus:outline-none"
+                                  />
+                                </div>
+                                <p className="text-xs text-slate-400 mt-1">Paste direct image link</p>
+                              </div>
                             </div>
                             
-                            {/* URL Input */}
+                            {/* Image Alt Text */}
                             <div>
-                              <div className="flex items-center space-x-2 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3">
-                                <LinkIcon className="w-4 h-4 text-slate-400" />
-                                <input
-                                  type="text"
-                                  value={editingItem.image_url?.startsWith('data:') ? '' : (editingItem.image_url || '')}
-                                  onChange={(e) => setEditingItem({ ...editingItem, image_url: e.target.value })}
-                                  placeholder="Or paste image URL"
-                                  className="flex-1 bg-transparent text-white focus:outline-none"
-                                />
-                              </div>
-                              <p className="text-xs text-slate-400 mt-1">Paste direct image link</p>
+                              <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Image Alt Text
+                              </label>
+                              <input
+                                type="text"
+                                value={editingItem.image_alt || ''}
+                                onChange={(e) => setEditingItem({ ...editingItem, image_alt: e.target.value })}
+                                placeholder="Describe the image for accessibility"
+                                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                              />
                             </div>
                           </div>
-                          
-                          {/* Image Alt Text */}
-                          <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-2">
-                              Image Alt Text
-                            </label>
-                            <input
-                              type="text"
-                              value={editingItem.image_alt || ''}
-                              onChange={(e) => setEditingItem({ ...editingItem, image_alt: e.target.value })}
-                              placeholder="Describe the image for accessibility"
-                              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                            />
-                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* Tool-specific fields */}
                       {activeTab === 'tools' && (
@@ -735,7 +766,7 @@ const Admin: React.FC = () => {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
-                          SEO Title
+                          Meta Title *
                           <span className="text-xs text-slate-400 ml-2">(60 characters max)</span>
                         </label>
                         <input
@@ -746,7 +777,7 @@ const Admin: React.FC = () => {
                             setEditingItem({ ...editingItem, seo_title: value });
                           }}
                           className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                          placeholder="Enter SEO title"
+                          placeholder="Same as title or optimized version"
                         />
                         <div className="text-xs text-slate-400 mt-1">
                           {(editingItem.seo_title?.length || 0)}/60 characters
@@ -755,7 +786,7 @@ const Admin: React.FC = () => {
 
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
-                          SEO Description
+                          Meta Description *
                           <span className="text-xs text-slate-400 ml-2">(160 characters max)</span>
                         </label>
                         <textarea
@@ -766,7 +797,7 @@ const Admin: React.FC = () => {
                           }}
                           rows={3}
                           className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                          placeholder="Enter SEO description"
+                          placeholder="Same as description or optimized version"
                         />
                         <div className="text-xs text-slate-400 mt-1">
                           {(editingItem.seo_description?.length || 0)}/160 characters
