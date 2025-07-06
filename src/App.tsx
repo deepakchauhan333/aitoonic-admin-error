@@ -23,8 +23,8 @@ import NotFound from './pages/NotFound';
 import { AuthProvider } from './context/AuthContext';
 import { ScrollToTop } from './components/ScrollToTop';
 import { useSSR } from './hooks/useSSR';
-import { preloadCriticalResources, addResourceHints } from './utils/preloader';
-import { trackWebVitals } from './utils/performance';
+import { preloadCriticalResources } from './utils/preloader';
+import { trackWebVitals, addResourceHints } from './utils/performance';
 
 const App: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
