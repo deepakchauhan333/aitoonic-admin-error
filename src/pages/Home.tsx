@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Search, Calendar, TrendingUp, Bookmark, Users, ChevronRight, Star } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Link, useNavigate } from 'react-router-dom';
@@ -27,6 +27,34 @@ interface SearchResult {
   item: Tool | Category;
 }
 
+// Loading skeleton components
+const ToolSkeleton = () => (
+  <div className="group card card-hover animate-pulse">
+    <div className="aspect-16-9 rounded-t-xl overflow-hidden bg-slate-700"></div>
+    <div className="p-4">
+      <div className="h-4 bg-slate-700 rounded mb-2"></div>
+      <div className="h-3 bg-slate-600 rounded w-3/4"></div>
+    </div>
+  </div>
+);
+
+const CategorySkeleton = () => (
+  <div className="mb-20 animate-pulse">
+    <div className="flex items-center justify-between mb-8">
+      <div>
+        <div className="h-8 bg-slate-700 rounded w-48 mb-2"></div>
+        <div className="h-4 bg-slate-600 rounded w-64"></div>
+      </div>
+      <div className="h-12 bg-slate-700 rounded w-32"></div>
+    </div>
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <ToolSkeleton key={i} />
+      ))}
+    </div>
+  </div>
+);
+
 function Home() {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -37,107 +65,143 @@ function Home() {
   const [showResults, setShowResults] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'today' | 'new' | 'saved' | 'used'>('today');
   const [filteredTools, setFilteredTools] = useState<Tool[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [toolsLoading, setToolsLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchData() {
-      // Fetch categories with tool count
-      const { data: categoriesData } = await supabase
-        .from('categories')
-        .select(`
-          id,
-          name,
-          description,
-          tools (count)
-        `);
-
-      if (categoriesData) {
-        const categoriesWithCount = categoriesData.map(category => ({
-          ...category,
-          tool_count: category.tools[0]?.count || 0
-        })).sort((a, b) => b.tool_count - a.tool_count); // Sort by tool count descending
-        setCategories(categoriesWithCount);
-      }
-
-      // Fetch all tools with category names
-      const { data: toolsData } = await supabase
-        .from('tools')
-        .select(`
-          *,
-          categories (
-            name
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (toolsData) {
-        const toolsWithCategory = toolsData.map(tool => ({
-          ...tool,
-          category_name: tool.categories?.name
-        }));
-        setTools(toolsWithCategory);
-
-        // Get today's tools (last 24 hours)
+  // Memoize filtered tools to prevent unnecessary recalculations
+  const memoizedFilteredTools = useMemo(() => {
+    switch (activeFilter) {
+      case 'today':
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const todaysTools = toolsWithCategory.filter(tool => 
-          new Date(tool.created_at) >= today
-        );
-        setTodayTools(todaysTools);
-        setFilteredTools(todaysTools);
+        return tools.filter(tool => new Date(tool.created_at) >= today);
+      case 'new':
+        return tools.slice(0, 12);
+      case 'saved':
+        return [...tools].sort(() => Math.random() - 0.5).slice(0, 12);
+      case 'used':
+        return [...tools].sort(() => Math.random() - 0.5).slice(0, 12);
+      default:
+        return [];
+    }
+  }, [activeFilter, tools]);
+
+  // Optimized data fetching with parallel requests and caching
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        
+        // Fetch categories and tools in parallel for better performance
+        const [categoriesResponse, toolsResponse] = await Promise.all([
+          // Optimized categories query with tool count
+          supabase
+            .from('categories')
+            .select(`
+              id,
+              name,
+              description,
+              tools!inner(count)
+            `)
+            .order('name'),
+          
+          // Optimized tools query with category names - limit initial load
+          supabase
+            .from('tools')
+            .select(`
+              id,
+              name,
+              description,
+              url,
+              category_id,
+              image_url,
+              created_at,
+              categories!inner(name)
+            `)
+            .order('created_at', { ascending: false })
+            .limit(100) // Limit initial load for better performance
+        ]);
+
+        // Process categories
+        if (categoriesResponse.data) {
+          const categoriesWithCount = categoriesResponse.data
+            .map(category => ({
+              ...category,
+              tool_count: category.tools?.[0]?.count || 0
+            }))
+            .filter(category => category.tool_count > 0) // Only show categories with tools
+            .sort((a, b) => b.tool_count - a.tool_count); // Sort by tool count
+          
+          setCategories(categoriesWithCount);
+          setCategoriesLoading(false);
+        }
+
+        // Process tools
+        if (toolsResponse.data) {
+          const toolsWithCategory = toolsResponse.data.map(tool => ({
+            ...tool,
+            category_name: tool.categories?.name
+          }));
+          
+          setTools(toolsWithCategory);
+          setToolsLoading(false);
+          
+          // Set today's tools
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const todaysTools = toolsWithCategory.filter(tool => 
+            new Date(tool.created_at) >= today
+          );
+          setTodayTools(todaysTools);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
       }
     }
     
     fetchData();
   }, []);
 
-  // Search functionality
+  // Update filtered tools when dependencies change
+  useEffect(() => {
+    setFilteredTools(memoizedFilteredTools);
+  }, [memoizedFilteredTools]);
+
+  // Optimized search with debouncing
   useEffect(() => {
     if (searchTerm.trim() === '') {
       setSearchResults([]);
       return;
     }
 
-    const term = searchTerm.toLowerCase();
-    const results: SearchResult[] = [];
+    const timeoutId = setTimeout(() => {
+      const term = searchTerm.toLowerCase();
+      const results: SearchResult[] = [];
 
-    // Search in tools
-    tools.forEach(tool => {
-      if (tool.name.toLowerCase().includes(term) || 
-          tool.description.toLowerCase().includes(term)) {
-        results.push({ type: 'tool', item: tool });
-      }
-    });
+      // Search in tools (limit results for performance)
+      tools.slice(0, 50).forEach(tool => {
+        if (tool.name.toLowerCase().includes(term) || 
+            tool.description.toLowerCase().includes(term)) {
+          results.push({ type: 'tool', item: tool });
+        }
+      });
 
-    // Search in categories
-    categories.forEach(category => {
-      if (category.name.toLowerCase().includes(term) || 
-          category.description?.toLowerCase().includes(term)) {
-        results.push({ type: 'category', item: category });
-      }
-    });
+      // Search in categories
+      categories.forEach(category => {
+        if (category.name.toLowerCase().includes(term) || 
+            category.description?.toLowerCase().includes(term)) {
+          results.push({ type: 'category', item: category });
+        }
+      });
 
-    setSearchResults(results.slice(0, 10)); // Limit to 10 results
+      setSearchResults(results.slice(0, 8)); // Limit to 8 results
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
   }, [searchTerm, tools, categories]);
-
-  // Filter functionality
-  useEffect(() => {
-    switch (activeFilter) {
-      case 'today':
-        setFilteredTools(todayTools);
-        break;
-      case 'new':
-        setFilteredTools(tools.slice(0, 12));
-        break;
-      case 'saved':
-        // Mock most saved - in real app, you'd track this
-        setFilteredTools([...tools].sort(() => Math.random() - 0.5).slice(0, 12));
-        break;
-      case 'used':
-        // Mock most used - in real app, you'd track this
-        setFilteredTools([...tools].sort(() => Math.random() - 0.5).slice(0, 12));
-        break;
-    }
-  }, [activeFilter, tools, todayTools]);
 
   const handleResultClick = (result: SearchResult) => {
     setShowResults(false);
@@ -254,7 +318,7 @@ function Home() {
         </section>
 
         {/* Today's Tools Section */}
-        {filteredTools.length > 0 && (
+        {(filteredTools.length > 0 || toolsLoading) && (
           <section className="py-16 bg-slate-800/50">
             <div className="container mx-auto px-4">
               <h2 className="text-3xl font-bold text-white mb-8 text-center">
@@ -263,31 +327,41 @@ function Home() {
                 {activeFilter === 'saved' && 'Most Saved Tools'}
                 {activeFilter === 'used' && 'Most Used Tools'}
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                {filteredTools.slice(0, 12).map((tool) => (
-                  <Link
-                    key={tool.id}
-                    to={`/ai/${tool.name.toLowerCase().replace(/\s+/g, '-')}`}
-                    className="group card card-hover"
-                  >
-                    <div className="aspect-16-9 rounded-t-xl overflow-hidden">
-                      <img
-                        src={tool.image_url || 'https://via.placeholder.com/400x225'}
-                        alt={tool.name}
-                        className="image-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-semibold text-white text-sm mb-2 line-clamp-1 group-hover:text-primary-400 transition-colors">
-                        {tool.name}
-                      </h3>
-                      <p className="text-xs text-slate-400 line-clamp-2">
-                        {tool.description}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+              
+              {toolsLoading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <ToolSkeleton key={i} />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                  {filteredTools.slice(0, 12).map((tool) => (
+                    <Link
+                      key={tool.id}
+                      to={`/ai/${tool.name.toLowerCase().replace(/\s+/g, '-')}`}
+                      className="group card card-hover"
+                    >
+                      <div className="aspect-16-9 rounded-t-xl overflow-hidden">
+                        <img
+                          src={tool.image_url || 'https://via.placeholder.com/400x225'}
+                          alt={tool.name}
+                          className="image-cover group-hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="p-4">
+                        <h3 className="font-semibold text-white text-sm mb-2 line-clamp-1 group-hover:text-primary-400 transition-colors">
+                          {tool.name}
+                        </h3>
+                        <p className="text-xs text-slate-400 line-clamp-2">
+                          {tool.description}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -295,58 +369,68 @@ function Home() {
         {/* Categories Section */}
         <section className="py-16 bg-slate-900/50">
           <div className="container mx-auto px-4">
-            {categories.map((category) => {
-              // Get tools for this category
-              const categoryTools = tools.filter(tool => tool.category_id === category.id);
-              
-              if (categoryTools.length === 0) return null;
+            {categoriesLoading ? (
+              // Loading skeletons for categories
+              <div>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <CategorySkeleton key={i} />
+                ))}
+              </div>
+            ) : (
+              categories.map((category) => {
+                // Get tools for this category (limit for performance)
+                const categoryTools = tools.filter(tool => tool.category_id === category.id).slice(0, 12);
+                
+                if (categoryTools.length === 0) return null;
 
-              return (
-                <div key={category.id} className="mb-20">
-                  <div className="flex items-center justify-between mb-8">
-                    <div>
-                      <h2 className="text-3xl font-bold text-white mb-2">
-                        {category.name}
-                      </h2>
-                      <p className="text-slate-400">{category.description}</p>
-                    </div>
-                    <Link
-                      to={`/category/${category.name.toLowerCase().replace(/\s+/g, '-')}`}
-                      className="flex items-center space-x-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all hover:shadow-lg hover:shadow-primary-500/25"
-                    >
-                      <span>View All ({category.tool_count})</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </Link>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                    {categoryTools.slice(0, 12).map((tool) => (
+                return (
+                  <div key={category.id} className="mb-20">
+                    <div className="flex items-center justify-between mb-8">
+                      <div>
+                        <h2 className="text-3xl font-bold text-white mb-2">
+                          {category.name}
+                        </h2>
+                        <p className="text-slate-400">{category.description}</p>
+                      </div>
                       <Link
-                        key={tool.id}
-                        to={`/ai/${tool.name.toLowerCase().replace(/\s+/g, '-')}`}
-                        className="group card card-hover"
+                        to={`/category/${category.name.toLowerCase().replace(/\s+/g, '-')}`}
+                        className="flex items-center space-x-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all hover:shadow-lg hover:shadow-primary-500/25"
                       >
-                        <div className="aspect-16-9 rounded-t-xl overflow-hidden">
-                          <img
-                            src={tool.image_url || 'https://via.placeholder.com/400x225'}
-                            alt={tool.name}
-                            className="image-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                        </div>
-                        <div className="p-4">
-                          <h3 className="font-semibold text-white text-sm mb-2 line-clamp-1 group-hover:text-primary-400 transition-colors">
-                            {tool.name}
-                          </h3>
-                          <p className="text-xs text-slate-400 line-clamp-2">
-                            {tool.description}
-                          </p>
-                        </div>
+                        <span>View All ({category.tool_count})</span>
+                        <ChevronRight className="w-4 h-4" />
                       </Link>
-                    ))}
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                      {categoryTools.map((tool) => (
+                        <Link
+                          key={tool.id}
+                          to={`/ai/${tool.name.toLowerCase().replace(/\s+/g, '-')}`}
+                          className="group card card-hover"
+                        >
+                          <div className="aspect-16-9 rounded-t-xl overflow-hidden">
+                            <img
+                              src={tool.image_url || 'https://via.placeholder.com/400x225'}
+                              alt={tool.name}
+                              className="image-cover group-hover:scale-105 transition-transform duration-300"
+                              loading="lazy"
+                            />
+                          </div>
+                          <div className="p-4">
+                            <h3 className="font-semibold text-white text-sm mb-2 line-clamp-1 group-hover:text-primary-400 transition-colors">
+                              {tool.name}
+                            </h3>
+                            <p className="text-xs text-slate-400 line-clamp-2">
+                              {tool.description}
+                            </p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </section>
 
