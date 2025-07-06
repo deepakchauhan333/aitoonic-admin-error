@@ -13,7 +13,7 @@ function Terms() {
           <h1 className="text-4xl font-bold mb-8 gradient-text">Terms & Conditions</h1>
           
           <div className="prose prose-invert prose-lg">
-            <p>Last updated: {new Date().toLocaleDateString()}</p>
+            <p>Last updated: July 25, 2024</p>
             
             <h2>1. Acceptance of Terms</h2>
             <p>

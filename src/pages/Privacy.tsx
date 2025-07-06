@@ -13,7 +13,7 @@ function Privacy() {
           <h1 className="text-4xl font-bold mb-8 gradient-text">Privacy Policy</h1>
           
           <div className="prose prose-invert prose-lg">
-            <p>Last updated: {new Date().toLocaleDateString()}</p>
+            <p>Last updated: July 25, 2024</p>
             
             <h2>1. Information We Collect</h2>
             <p>
