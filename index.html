@@ -52,9 +52,19 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     
     <!-- Critical CSS -->
-    <link rel="preload" href="/src/index.css" as="style">
-    
-    <!--app-head-->
+    <style>
+      /* Critical CSS for immediate styling */
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { max-width: 100%; overflow-x: hidden; }
+      body { 
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        color: #ffffff;
+        font-family: Inter, system-ui, sans-serif;
+        line-height: 1.5;
+        min-height: 100vh;
+      }
+      #root { min-height: 100vh; }
+    </style>
   </head>
   <body>
     <!-- Google Tag Manager (noscript) -->
@@ -64,7 +74,7 @@
     </noscript>
     <!-- End Google Tag Manager (noscript) -->
 
-    <div id="root"><!--app-html--></div>
-    <script type="module" src="/src/entry-client.tsx"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
