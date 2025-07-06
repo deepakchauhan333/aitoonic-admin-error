@@ -20,14 +20,13 @@
   --dark-card: #0F1428;
 }
 
-/* Reset box-sizing */
+/* Critical CSS - Above the fold styles */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-/* Fix horizontal scrolling */
 html, body {
   max-width: 100%;
   overflow-x: hidden;
@@ -41,6 +40,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+  font-family: Inter, system-ui, sans-serif;
 }
 
 /* Container max-width and padding */
@@ -61,6 +61,7 @@ body {
 
 .card-hover {
   transition: all 0.3s ease;
+  will-change: transform;
 }
 
 .card-hover:hover {
@@ -78,6 +79,7 @@ body {
   font-weight: 600;
   transition: all 0.3s ease;
   cursor: pointer;
+  will-change: transform;
 }
 
 .btn-primary:hover {
@@ -92,6 +94,7 @@ body {
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 1rem;
   transition: all 0.3s ease;
+  will-change: transform, box-shadow;
 }
 
 .card:hover {
@@ -108,104 +111,23 @@ body {
   aspect-ratio: 1 / 1;
 }
 
-/* Image Styles - Fixed to prevent cropping */
+/* Image Styles - Optimized for performance */
 .image-cover {
   width: 100%;
   height: 100%;
-  object-fit: contain; /* Changed from cover to contain to prevent cropping */
+  object-fit: contain;
   object-position: center;
-  background: #1e293b; /* Add background color for letterboxing */
-}
-
-/* TipTap Editor Styles */
-.ProseMirror {
-  min-height: 300px;
-  outline: none;
-}
-
-.ProseMirror p.is-editor-empty:first-child::before {
-  color: #666;
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
-}
-
-.ProseMirror img {
-  max-width: 100%;
-  height: auto;
-  margin: 1rem 0;
-}
-
-.ProseMirror blockquote {
-  border-left: 4px solid var(--primary);
-  padding-left: 1rem;
-  margin: 1rem 0;
-  color: #999;
-}
-
-.ProseMirror pre {
-  background: var(--bg-primary);
-  border-radius: 0.5rem;
-  padding: 1rem;
-  margin: 1rem 0;
-  font-family: 'Fira Code', monospace;
-  overflow-x: auto;
-}
-
-.ProseMirror ul,
-.ProseMirror ol {
-  padding-left: 1.5rem;
-  margin: 1rem 0;
-}
-
-.ProseMirror h1 {
-  font-size: 2.5rem;
-  margin: 2rem 0 1rem;
-}
-
-.ProseMirror h2 {
-  font-size: 2rem;
-  margin: 1.5rem 0 1rem;
-}
-
-.ProseMirror a {
-  color: var(--primary);
-  text-decoration: underline;
-}
-
-.ProseMirror a:hover {
-  opacity: 0.8;
+  background: #1e293b;
 }
 
 /* Responsive images */
 img {
   max-width: 100%;
   height: auto;
-}
-
-/* Responsive tables */
-table {
-  width: 100%;
-  overflow-x: auto;
   display: block;
 }
 
-/* Mobile-specific styles */
-@media (max-width: 640px) {
-  .container {
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
-  
-  /* Prevent text from breaking out */
-  h1, h2, h3, h4, h5, h6, p, span {
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-  }
-}
-
-/* Loading animations */
+/* Loading animations - GPU accelerated */
 @keyframes pulse {
   0%, 100% {
     opacity: 1;
@@ -231,4 +153,52 @@ textarea:focus,
 select:focus {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+/* Performance optimizations */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-auto {
+  will-change: auto;
+}
+
+/* Mobile-specific optimizations */
+@media (max-width: 640px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  /* Prevent text from breaking out */
+  h1, h2, h3, h4, h5, h6, p, span {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  /* Optimize touch targets */
+  button, a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .card {
+    border-width: 2px;
+  }
 }

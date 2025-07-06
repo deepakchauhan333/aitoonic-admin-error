@@ -1,8 +1,10 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Search, Calendar, TrendingUp, Bookmark, Users, ChevronRight, Star } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Link, useNavigate } from 'react-router-dom';
 import { SEO } from '../components/SEO';
+import { LazyImage } from '../components/LazyImage';
+import { usePerformance } from '../hooks/usePerformance';
 
 interface Category {
   id: string;
@@ -27,8 +29,8 @@ interface SearchResult {
   item: Tool | Category;
 }
 
-// Loading skeleton components
-const ToolSkeleton = () => (
+// Optimized loading skeleton components
+const ToolSkeleton = React.memo(() => (
   <div className="group card card-hover animate-pulse">
     <div className="aspect-16-9 rounded-t-xl overflow-hidden bg-slate-700"></div>
     <div className="p-4">
@@ -36,9 +38,9 @@ const ToolSkeleton = () => (
       <div className="h-3 bg-slate-600 rounded w-3/4"></div>
     </div>
   </div>
-);
+));
 
-const CategorySkeleton = () => (
+const CategorySkeleton = React.memo(() => (
   <div className="mb-20 animate-pulse">
     <div className="flex items-center justify-between mb-8">
       <div>
@@ -53,29 +55,53 @@ const CategorySkeleton = () => (
       ))}
     </div>
   </div>
-);
+));
+
+// Memoized tool card component
+const ToolCard = React.memo(({ tool, priority = false }: { tool: Tool; priority?: boolean }) => (
+  <Link
+    to={`/ai/${tool.name.toLowerCase().replace(/\s+/g, '-')}`}
+    className="group card card-hover will-change-transform"
+  >
+    <LazyImage
+      src={tool.image_url || 'https://images.unsplash.com/photo-1676277791608-ac54783d753b?auto=format&fit=crop&q=80&w=400'}
+      alt={tool.name}
+      priority={priority}
+      className="aspect-16-9 rounded-t-xl overflow-hidden"
+    />
+    <div className="p-4">
+      <h3 className="font-semibold text-white text-sm mb-2 line-clamp-1 group-hover:text-primary-400 transition-colors">
+        {tool.name}
+      </h3>
+      <p className="text-xs text-slate-400 line-clamp-2">
+        {tool.description}
+      </p>
+    </div>
+  </Link>
+));
 
 function Home() {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
   const [tools, setTools] = useState<Tool[]>([]);
-  const [todayTools, setTodayTools] = useState<Tool[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showResults, setShowResults] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'today' | 'new' | 'saved' | 'used'>('today');
-  const [filteredTools, setFilteredTools] = useState<Tool[]>([]);
+  const [activeFilter, setActiveFilter] = useState<'today' | 'new' | 'saved' | 'used'>('new');
   const [loading, setLoading] = useState(true);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [toolsLoading, setToolsLoading] = useState(true);
 
+  // Use performance hook
+  usePerformance();
+
   // Memoize filtered tools to prevent unnecessary recalculations
-  const memoizedFilteredTools = useMemo(() => {
+  const filteredTools = useMemo(() => {
     switch (activeFilter) {
       case 'today':
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        return tools.filter(tool => new Date(tool.created_at) >= today);
+        return tools.filter(tool => new Date(tool.created_at) >= today).slice(0, 12);
       case 'new':
         return tools.slice(0, 12);
       case 'saved':
@@ -87,7 +113,7 @@ function Home() {
     }
   }, [activeFilter, tools]);
 
-  // Optimized data fetching with parallel requests and caching
+  // Optimized data fetching with parallel requests
   useEffect(() => {
     async function fetchData() {
       try {
@@ -95,65 +121,50 @@ function Home() {
         
         // Fetch categories and tools in parallel for better performance
         const [categoriesResponse, toolsResponse] = await Promise.all([
-          // Optimized categories query with tool count
+          // Optimized categories query
           supabase
             .from('categories')
-            .select(`
-              id,
-              name,
-              description,
-              tools!inner(count)
-            `)
-            .order('name'),
+            .select('id, name, description')
+            .order('name')
+            .limit(10), // Limit categories for initial load
           
-          // Optimized tools query with category names - limit initial load
+          // Optimized tools query - limit initial load for better LCP
           supabase
             .from('tools')
-            .select(`
-              id,
-              name,
-              description,
-              url,
-              category_id,
-              image_url,
-              created_at,
-              categories!inner(name)
-            `)
+            .select('id, name, description, url, category_id, image_url, created_at')
             .order('created_at', { ascending: false })
-            .limit(100) // Limit initial load for better performance
+            .limit(50) // Reduced limit for faster initial load
         ]);
 
         // Process categories
         if (categoriesResponse.data) {
-          const categoriesWithCount = categoriesResponse.data
-            .map(category => ({
-              ...category,
-              tool_count: category.tools?.[0]?.count || 0
-            }))
-            .filter(category => category.tool_count > 0) // Only show categories with tools
-            .sort((a, b) => b.tool_count - a.tool_count); // Sort by tool count
+          // Get tool counts separately for better performance
+          const categoriesWithCounts = await Promise.all(
+            categoriesResponse.data.map(async (category) => {
+              const { count } = await supabase
+                .from('tools')
+                .select('*', { count: 'exact', head: true })
+                .eq('category_id', category.id);
+              
+              return {
+                ...category,
+                tool_count: count || 0
+              };
+            })
+          );
           
-          setCategories(categoriesWithCount);
+          const validCategories = categoriesWithCounts
+            .filter(category => category.tool_count > 0)
+            .sort((a, b) => b.tool_count - a.tool_count);
+          
+          setCategories(validCategories);
           setCategoriesLoading(false);
         }
 
         // Process tools
         if (toolsResponse.data) {
-          const toolsWithCategory = toolsResponse.data.map(tool => ({
-            ...tool,
-            category_name: tool.categories?.name
-          }));
-          
-          setTools(toolsWithCategory);
+          setTools(toolsResponse.data);
           setToolsLoading(false);
-          
-          // Set today's tools
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const todaysTools = toolsWithCategory.filter(tool => 
-            new Date(tool.created_at) >= today
-          );
-          setTodayTools(todaysTools);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -165,45 +176,49 @@ function Home() {
     fetchData();
   }, []);
 
-  // Update filtered tools when dependencies change
-  useEffect(() => {
-    setFilteredTools(memoizedFilteredTools);
-  }, [memoizedFilteredTools]);
-
   // Optimized search with debouncing
+  const debouncedSearch = useCallback(
+    useMemo(() => {
+      let timeoutId: NodeJS.Timeout;
+      return (term: string) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          if (term.trim() === '') {
+            setSearchResults([]);
+            return;
+          }
+
+          const searchTerm = term.toLowerCase();
+          const results: SearchResult[] = [];
+
+          // Search in tools (limit for performance)
+          tools.slice(0, 20).forEach(tool => {
+            if (tool.name.toLowerCase().includes(searchTerm) || 
+                tool.description.toLowerCase().includes(searchTerm)) {
+              results.push({ type: 'tool', item: tool });
+            }
+          });
+
+          // Search in categories
+          categories.forEach(category => {
+            if (category.name.toLowerCase().includes(searchTerm) || 
+                category.description?.toLowerCase().includes(searchTerm)) {
+              results.push({ type: 'category', item: category });
+            }
+          });
+
+          setSearchResults(results.slice(0, 6)); // Limit to 6 results
+        }, 300);
+      };
+    }, [tools, categories]),
+    [tools, categories]
+  );
+
   useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setSearchResults([]);
-      return;
-    }
+    debouncedSearch(searchTerm);
+  }, [searchTerm, debouncedSearch]);
 
-    const timeoutId = setTimeout(() => {
-      const term = searchTerm.toLowerCase();
-      const results: SearchResult[] = [];
-
-      // Search in tools (limit results for performance)
-      tools.slice(0, 50).forEach(tool => {
-        if (tool.name.toLowerCase().includes(term) || 
-            tool.description.toLowerCase().includes(term)) {
-          results.push({ type: 'tool', item: tool });
-        }
-      });
-
-      // Search in categories
-      categories.forEach(category => {
-        if (category.name.toLowerCase().includes(term) || 
-            category.description?.toLowerCase().includes(term)) {
-          results.push({ type: 'category', item: category });
-        }
-      });
-
-      setSearchResults(results.slice(0, 8)); // Limit to 8 results
-    }, 300); // 300ms debounce
-
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm, tools, categories]);
-
-  const handleResultClick = (result: SearchResult) => {
+  const handleResultClick = useCallback((result: SearchResult) => {
     setShowResults(false);
     setSearchTerm('');
 
@@ -212,7 +227,7 @@ function Home() {
     } else {
       navigate(`/category/${result.item.name.toLowerCase().replace(/\s+/g, '-')}`);
     }
-  };
+  }, [navigate]);
 
   // Close search results when clicking outside
   useEffect(() => {
@@ -244,7 +259,7 @@ function Home() {
                 Discover The Best AI Websites & Tools
               </h1>
               <p className="text-xl text-slate-300 mb-8">
-                Discover the best AI tools directory. AI tools list & GPTs store are updated daily by ChatGPT.
+                Discover the best AI tools directory. AI tools list & GPTs store are updated daily.
               </p>
 
               {/* Search Bar */}
@@ -253,7 +268,7 @@ function Home() {
                   <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
                   <input
                     type="text"
-                    placeholder="Search AI Tools, Video Translation or Tool"
+                    placeholder="Search AI Tools..."
                     value={searchTerm}
                     onChange={(e) => {
                       setSearchTerm(e.target.value);
@@ -294,15 +309,15 @@ function Home() {
               {/* Filter Buttons */}
               <div className="flex flex-wrap justify-center gap-3 mb-12">
                 {[
-                  { key: 'today', label: 'Today', icon: Calendar },
                   { key: 'new', label: 'New', icon: Star },
+                  { key: 'today', label: 'Today', icon: Calendar },
                   { key: 'saved', label: 'Most Saved', icon: Bookmark },
                   { key: 'used', label: 'Most Used', icon: TrendingUp }
                 ].map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}
                     onClick={() => setActiveFilter(key as any)}
-                    className={`flex items-center space-x-2 px-6 py-3 rounded-full text-sm font-medium transition-all ${
+                    className={`flex items-center space-x-2 px-6 py-3 rounded-full text-sm font-medium transition-all will-change-transform ${
                       activeFilter === key
                         ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25'
                         : 'bg-white/10 backdrop-blur-sm text-slate-300 hover:bg-white/20 border border-white/20'
@@ -317,7 +332,7 @@ function Home() {
           </div>
         </section>
 
-        {/* Today's Tools Section */}
+        {/* Featured Tools Section */}
         {(filteredTools.length > 0 || toolsLoading) && (
           <section className="py-16 bg-slate-800/50">
             <div className="container mx-auto px-4">
@@ -336,29 +351,12 @@ function Home() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                  {filteredTools.slice(0, 12).map((tool) => (
-                    <Link
-                      key={tool.id}
-                      to={`/ai/${tool.name.toLowerCase().replace(/\s+/g, '-')}`}
-                      className="group card card-hover"
-                    >
-                      <div className="aspect-16-9 rounded-t-xl overflow-hidden">
-                        <img
-                          src={tool.image_url || 'https://via.placeholder.com/400x225'}
-                          alt={tool.name}
-                          className="image-cover group-hover:scale-105 transition-transform duration-300"
-                          loading="lazy"
-                        />
-                      </div>
-                      <div className="p-4">
-                        <h3 className="font-semibold text-white text-sm mb-2 line-clamp-1 group-hover:text-primary-400 transition-colors">
-                          {tool.name}
-                        </h3>
-                        <p className="text-xs text-slate-400 line-clamp-2">
-                          {tool.description}
-                        </p>
-                      </div>
-                    </Link>
+                  {filteredTools.map((tool, index) => (
+                    <ToolCard 
+                      key={tool.id} 
+                      tool={tool} 
+                      priority={index < 6} // First 6 images load with priority
+                    />
                   ))}
                 </div>
               )}
@@ -370,16 +368,14 @@ function Home() {
         <section className="py-16 bg-slate-900/50">
           <div className="container mx-auto px-4">
             {categoriesLoading ? (
-              // Loading skeletons for categories
               <div>
                 {Array.from({ length: 3 }).map((_, i) => (
                   <CategorySkeleton key={i} />
                 ))}
               </div>
             ) : (
-              categories.map((category) => {
-                // Get tools for this category (limit for performance)
-                const categoryTools = tools.filter(tool => tool.category_id === category.id).slice(0, 12);
+              categories.slice(0, 5).map((category) => { // Limit to 5 categories for initial load
+                const categoryTools = tools.filter(tool => tool.category_id === category.id).slice(0, 6);
                 
                 if (categoryTools.length === 0) return null;
 
@@ -394,7 +390,7 @@ function Home() {
                       </div>
                       <Link
                         to={`/category/${category.name.toLowerCase().replace(/\s+/g, '-')}`}
-                        className="flex items-center space-x-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all hover:shadow-lg hover:shadow-primary-500/25"
+                        className="flex items-center space-x-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all hover:shadow-lg hover:shadow-primary-500/25 will-change-transform"
                       >
                         <span>View All ({category.tool_count})</span>
                         <ChevronRight className="w-4 h-4" />
@@ -403,28 +399,7 @@ function Home() {
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
                       {categoryTools.map((tool) => (
-                        <Link
-                          key={tool.id}
-                          to={`/ai/${tool.name.toLowerCase().replace(/\s+/g, '-')}`}
-                          className="group card card-hover"
-                        >
-                          <div className="aspect-16-9 rounded-t-xl overflow-hidden">
-                            <img
-                              src={tool.image_url || 'https://via.placeholder.com/400x225'}
-                              alt={tool.name}
-                              className="image-cover group-hover:scale-105 transition-transform duration-300"
-                              loading="lazy"
-                            />
-                          </div>
-                          <div className="p-4">
-                            <h3 className="font-semibold text-white text-sm mb-2 line-clamp-1 group-hover:text-primary-400 transition-colors">
-                              {tool.name}
-                            </h3>
-                            <p className="text-xs text-slate-400 line-clamp-2">
-                              {tool.description}
-                            </p>
-                          </div>
-                        </Link>
+                        <ToolCard key={tool.id} tool={tool} />
                       ))}
                     </div>
                   </div>
@@ -450,7 +425,7 @@ function Home() {
                 />
                 <button
                   type="submit"
-                  className="w-full sm:w-auto bg-primary-500 hover:bg-primary-600 text-white px-8 py-4 rounded-xl font-medium whitespace-nowrap transition-all hover:shadow-lg hover:shadow-primary-500/25"
+                  className="w-full sm:w-auto bg-primary-500 hover:bg-primary-600 text-white px-8 py-4 rounded-xl font-medium whitespace-nowrap transition-all hover:shadow-lg hover:shadow-primary-500/25 will-change-transform"
                 >
                   Subscribe
                 </button>
